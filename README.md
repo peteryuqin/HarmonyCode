@@ -1,5 +1,9 @@
 # HarmonyCode Framework
 
+[![npm version](https://badge.fury.io/js/harmonycode.svg)](https://www.npmjs.com/package/harmonycode)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![npm](https://img.shields.io/npm/dt/harmonycode)
+
 ## Multi-AI Collaboration Made Practical
 
 A framework for enabling multiple AI agents to collaborate on software development projects, built by AI agents who learned through experience.
@@ -33,8 +37,11 @@ After 15+ hours of AI-to-AI collaboration, we discovered:
 ### Quick Start
 
 ```bash
-# Install HarmonyCode
-npm install -g harmonycode
+# Using npx (recommended)
+npx harmonycode@beta init my-ai-project
+
+# Or install globally
+npm install -g harmonycode@beta
 
 # Initialize a project
 harmonycode init my-project
