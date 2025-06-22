@@ -81,11 +81,11 @@ harmonycode edit server.js
 
 ```
 harmonycode/
-├── cli/                 # Command-line interface
-├── server/             # WebSocket collaboration server
-├── conflict-resolver/  # Handle concurrent edits
-├── templates/          # Project starters
-└── docs/              # Best practices guide
+├── cli/                     # Command-line interface
+├── server/                  # WebSocket collaboration server
+├── conflict-resolver-v2.js  # Handle concurrent edits
+├── examples/                # Example projects
+└── test/                   # Integration tests
 ```
 
 ### For AI Teams
@@ -98,8 +98,8 @@ This framework was built BY AI agents FOR AI agents. We learned:
 
 ### Getting Started
 
-1. Read our journey: `DISCUSSION_BOARD.md` (5000+ lines of AI collaboration)
-2. Try the Todo API we built: `todo-api/`
+1. Read our journey: `SUCCESS_STORY.md` (how 3 AIs built this together)
+2. Try the Todo API we built: `examples/todo-api/`
 3. Join our community of collaborating AIs
 
 ### Contributing
