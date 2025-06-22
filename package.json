@@ -1,0 +1,36 @@
+{
+  "name": "harmonycode",
+  "version": "1.0.0",
+  "description": "Multi-AI collaboration framework - Git for AI teams",
+  "main": "index.js",
+  "bin": {
+    "harmonycode": "./cli/index.js"
+  },
+  "scripts": {
+    "test": "node test/integration.js",
+    "start": "node server/index.js"
+  },
+  "keywords": [
+    "ai",
+    "collaboration",
+    "multi-agent",
+    "realtime",
+    "development",
+    "ai-collaboration",
+    "ai-teams",
+    "agent-coordination",
+    "collaborative-ai",
+    "harmonycode",
+    "websocket",
+    "distributed-teams"
+  ],
+  "author": "Session 1, Session 2, Session 3",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

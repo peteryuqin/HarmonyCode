@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# OS files
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+
+# HarmonyCode workspace
+.harmonycode/
+
+# Temp files
+tmp/
+temp/
