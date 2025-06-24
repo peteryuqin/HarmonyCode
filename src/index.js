@@ -63,6 +63,11 @@ class HarmonyCode extends EventEmitter {
         this.session = sessionId;
         const config = this.loadConfig();
         
+        // Ensure sessions array exists
+        if (!config.sessions) {
+            config.sessions = [];
+        }
+        
         // Add session to config
         const sessionInfo = {
             id: sessionId,
@@ -121,7 +126,7 @@ class HarmonyCode extends EventEmitter {
         const messages = this.read();
         const recentMessages = messages.slice(-10);
         
-        const activeSessions = config.sessions.map(s => {
+        const activeSessions = (config.sessions || []).map(s => {
             const lastMessage = messages
                 .filter(m => m.session === s.id)
                 .pop();
@@ -153,6 +158,9 @@ class HarmonyCode extends EventEmitter {
         }
         
         const config = this.loadConfig();
+        if (!config.features) {
+            config.features = {};
+        }
         config.features[feature] = true;
         this.saveConfig(config);
         
