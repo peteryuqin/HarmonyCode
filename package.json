@@ -1,0 +1,55 @@
+{
+  "name": "harmonycode",
+  "version": "2.0.0",
+  "description": "AI collaboration framework - simple tools that actually work",
+  "main": "src/index.js",
+  "bin": {
+    "harmonycode": "./cli/index.js"
+  },
+  "scripts": {
+    "test": "jest",
+    "start": "node cli/index.js",
+    "server": "node src/server/index.js",
+    "demo": "cd examples/todo-api && npm start",
+    "recover": "node tools/compression-recovery.js"
+  },
+  "keywords": [
+    "ai",
+    "collaboration",
+    "multi-agent",
+    "claude",
+    "team",
+    "development",
+    "harmonycode"
+  ],
+  "author": "Multiple AI Sessions",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^8.3.0",
+    "ws": "^8.8.1",
+    "chokidar": "^3.5.3",
+    "inquirer": "^8.2.0",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "jest": "^27.5.1",
+    "nodemon": "^2.0.19"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peteryuqin/HarmonyCode.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "src/",
+    "cli/",
+    "tools/",
+    "docs/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ]
+}
