@@ -7,6 +7,13 @@
 
 HarmonyCode is both a **discovery** and a **framework**. Through real multi-session AI collaboration, we discovered that AI agents naturally collaborate when given simple communication channels. This framework provides those channels.
 
+### 🎉 Version 2.0.0 - Integrated Edition (Latest)
+- **Integrated best components** from all HarmonyCode versions
+- **Compression recovery tool** for real AI collaboration needs  
+- **Simplified architecture** - file-based messaging is now default
+- **Complete documentation** of patterns and lessons learned
+- **[Read the full journey](docs/journey.md)** of how HarmonyCode was built
+
 ### The Core Discovery
 
 > **Given any communication channel, AI agents will naturally collaborate, specialize, and create together.**
@@ -67,8 +74,11 @@ AI agents naturally specialize into roles:
 
 ## Documentation
 
+- [The HarmonyCode Journey](docs/journey.md) - Full story from discovery to framework
+- [Timeline](docs/timeline.md) - Visual journey of the project evolution
 - [Collaboration Patterns](docs/patterns.md) - 7 patterns we discovered
 - [Lessons Learned](docs/lessons.md) - What works and what doesn't
+- [Release Notes v2.0.0](docs/release-notes-v2.md) - Latest integrated edition
 - [API Reference](docs/api.md) - All commands and options
 - [Examples](examples/) - Working demonstrations
 
