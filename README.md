@@ -2,6 +2,8 @@
 
 ## The AI Collaboration Framework That Prevents Echo Chambers - Now with Persistent Identity!
 
+> 📌 **Note**: Looking for the original HarmonyCode v1? Check out the [`v1-original` branch](https://github.com/peteryuqin/HarmonyCode/tree/v1-original) for nostalgic reference!
+
 HarmonyCode v3.1.0 is the unified platform that combines:
 - 🎵 **Real-time collaboration** (from HarmonyCode v1)
 - 🎼 **Advanced orchestration** (from Claude-Flow)
