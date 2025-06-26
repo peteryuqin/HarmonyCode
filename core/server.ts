@@ -12,6 +12,7 @@ import { OrchestrationEngine } from '../orchestration/engine';
 import { EnhancedSessionManager } from './session-manager-enhanced';
 import { IdentityManager } from './identity-manager';
 import { MessageRouter } from './message-router';
+import { RealtimeEnhancer } from './realtime-enhancer';
 
 export interface ServerConfig {
   port: number;
@@ -36,6 +37,7 @@ export class HarmonyCodeServer extends EventEmitter {
   private router: MessageRouter;
   private diversity: DiversityMiddleware;
   private orchestration: OrchestrationEngine;
+  private realtimeEnhancer: RealtimeEnhancer;
   private projectPath: string;
 
   constructor(config: ServerConfig = { port: 8765, enableAntiEcho: true }) {
@@ -47,6 +49,11 @@ export class HarmonyCodeServer extends EventEmitter {
     this.router = new MessageRouter();
     this.diversity = new DiversityMiddleware(config.diversityConfig);
     this.orchestration = new OrchestrationEngine(config.orchestrationConfig);
+    this.realtimeEnhancer = new RealtimeEnhancer({
+      watchPaths: [path.join(this.projectPath, '.harmonycode')],
+      enableNotifications: true,
+      enableLiveCursors: true
+    });
     
     // Connect components
     this.diversity.on('intervention', this.handleDiversityIntervention.bind(this));
@@ -79,6 +86,10 @@ export class HarmonyCodeServer extends EventEmitter {
     
     // Start orchestration engine
     await this.orchestration.initialize();
+    
+    // Start real-time file watching
+    this.realtimeEnhancer.startWatching();
+    this.setupRealtimeHandlers();
     
     // Monitor diversity metrics
     if (this.config.enableAntiEcho) {
@@ -175,6 +186,9 @@ export class HarmonyCodeServer extends EventEmitter {
       ws.removeAllListeners('message');
       ws.on('message', (data) => this.handleMessage(session, data));
       ws.on('close', () => this.handleDisconnect(session));
+      
+      // Set up real-time update stream for this session
+      this.realtimeEnhancer.createUpdateStream(ws);
       
       // Notify other sessions
       this.broadcastSessionUpdate('joined', session);
@@ -507,6 +521,57 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
+   * Set up real-time event handlers
+   */
+  private setupRealtimeHandlers(): void {
+    // Handle task board updates
+    this.realtimeEnhancer.on('task-board-updated', (event) => {
+      console.log('📋 Task board updated - notifying all sessions');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'task-board',
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle discussion updates
+    this.realtimeEnhancer.on('discussion-updated', (event) => {
+      console.log('💬 Discussion board updated - notifying all sessions');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'discussion',
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle new messages
+    this.realtimeEnhancer.on('new-message', (event) => {
+      console.log('📨 New message detected');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'new-message',
+        filename: event.filename,
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle concurrent editing notifications
+    this.realtimeEnhancer.on('concurrent-editing', (data) => {
+      console.log(`⚠️  Multiple editors on ${data.filepath}`);
+      data.editors.forEach(editorId => {
+        const session = this.sessions.getSession(editorId);
+        if (session) {
+          session.ws.send(JSON.stringify({
+            type: 'concurrent-editing-warning',
+            filepath: data.filepath,
+            otherEditors: data.editors.filter(id => id !== editorId)
+          }));
+        }
+      });
+    });
+  }
+
+  /**
    * Broadcast message to all or specific sessions
    */
   private broadcast(message: any, excludeSessionId?: string): void {
@@ -698,6 +763,9 @@ export class HarmonyCodeServer extends EventEmitter {
     // Save state
     await this.orchestration.saveState();
     await this.diversity.saveMetrics();
+    
+    // Stop real-time watchers
+    this.realtimeEnhancer.destroy();
     
     // Close connections
     this.sessions.getAllSessions().forEach(session => {
