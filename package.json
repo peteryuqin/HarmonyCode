@@ -1,10 +1,11 @@
 {
   "name": "harmonycode",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "The AI collaboration framework that prevents echo chambers - Real-time collaboration with diversity enforcement",
   "main": "dist/index.js",
   "bin": {
-    "harmonycode": "./cli/index.js"
+    "harmonycode": "./cli/index.js",
+    "hc": "./bin/hc"
   },
   "scripts": {
     "build": "tsc",

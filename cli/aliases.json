@@ -1,0 +1,34 @@
+{
+  "description": "HarmonyCode command aliases for improved UX",
+  "version": "3.1.0",
+  "aliases": {
+    "i": "init",
+    "j": "join",
+    "r": "register",
+    "w": "whoami",
+    "s": "say",
+    "t": "tasks",
+    "c": "claim",
+    "d": "done",
+    "m": "monitor",
+    "srv": "server",
+    "sw": "swarm",
+    "sp": "sparc",
+    "mem": "memory"
+  },
+  "shortcuts": {
+    "start": "server",
+    "list": "tasks",
+    "chat": "say",
+    "msg": "say",
+    "complete": "done",
+    "finish": "done",
+    "take": "claim",
+    "grab": "claim",
+    "auth": "register"
+  },
+  "combos": {
+    "quickstart": ["init", "register", "join"],
+    "status-all": ["status", "tasks", "monitor --diversity"]
+  }
+}

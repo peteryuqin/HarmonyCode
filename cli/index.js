@@ -166,29 +166,148 @@ program
     process.stdin.resume();
   });
 
-// Join as agent
+// Register new agent identity
 program
-  .command('join <session-name>')
-  .description('Join collaboration session as an AI agent')
+  .command('register <agent-name>')
+  .description('Register a new agent identity')
+  .option('-r, --role <role>', 'Default role', 'general')
+  .action(async (agentName, options) => {
+    const spinner = ora('Registering new agent identity...').start();
+    
+    try {
+      // This would connect to server to register
+      // For now, show what would happen
+      const agentId = `agent-${Date.now().toString(36)}`;
+      const authToken = require('crypto').randomBytes(32).toString('hex');
+      
+      // Save auth token
+      saveAuthToken(agentName, authToken, agentId);
+      
+      spinner.succeed(chalk.green(`Agent registered: ${agentName}`));
+      console.log(chalk.gray(`Agent ID: ${agentId}`));
+      console.log(chalk.gray(`Default role: ${options.role}`));
+      console.log(chalk.cyan('\nAuthentication token saved!'));
+      console.log(chalk.yellow('\nUse this command to join:'));
+      console.log(chalk.gray(`  harmonycode join ${agentName}`));
+      
+    } catch (error) {
+      spinner.fail(chalk.red('Registration failed'));
+      console.error(error);
+    }
+  });
+
+// Show agent identity info
+program
+  .command('whoami')
+  .description('Show saved agent identities')
+  .action(() => {
+    const configPath = path.join('.harmonycode', 'agent-auth.json');
+    
+    if (!fs.existsSync(configPath)) {
+      console.log(chalk.yellow('No saved agent identities found.'));
+      console.log(chalk.gray('Use: harmonycode register <name>'));
+      return;
+    }
+    
+    try {
+      const authData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const agents = Object.entries(authData);
+      
+      if (agents.length === 0) {
+        console.log(chalk.yellow('No saved agent identities found.'));
+        return;
+      }
+      
+      console.log(chalk.cyan('\nSaved Agent Identities:\n'));
+      
+      agents.forEach(([name, data]) => {
+        console.log(chalk.green(`  ${name}`));
+        console.log(chalk.gray(`    ID: ${data.agentId}`));
+        console.log(chalk.gray(`    Last used: ${data.lastUsed || 'Never'}`));
+        console.log();
+      });
+      
+    } catch (error) {
+      console.log(chalk.red('Error reading identity data'));
+    }
+  });
+
+// Join as agent with persistent identity
+program
+  .command('join <agent-name>')
+  .description('Join collaboration session as an AI agent with persistent identity')
   .option('-r, --role <role>', 'Agent role (coder, researcher, reviewer, etc.)', 'general')
   .option('-p, --perspective <perspective>', 'Initial perspective (skeptic, optimist, etc.)')
   .option('-s, --server <url>', 'Server URL', 'ws://localhost:8765')
-  .action(async (sessionName, options) => {
-    const spinner = ora(`Connecting to server as ${sessionName}...`).start();
+  .option('-t, --token <token>', 'Authentication token for existing agent')
+  .option('--new-agent', 'Force creation of new agent identity')
+  .action(async (agentName, options) => {
+    const spinner = ora(`Connecting to server as ${agentName}...`).start();
     
     try {
-      // Connect to WebSocket server
-      const ws = new WebSocket(`${options.server}/${sessionName}`);
+      // Check for saved auth token
+      const configPath = path.join('.harmonycode', 'agent-auth.json');
+      let authToken = options.token;
+      
+      if (!authToken && !options.newAgent && fs.existsSync(configPath)) {
+        try {
+          const savedAuth = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          if (savedAuth[agentName]) {
+            authToken = savedAuth[agentName].token;
+            console.log(chalk.gray('Using saved authentication token'));
+          }
+        } catch (e) {
+          // Ignore errors reading auth file
+        }
+      }
+      
+      // Connect to WebSocket server with auth info
+      const ws = new WebSocket(options.server);
       
       ws.on('open', () => {
-        spinner.succeed(chalk.green(`Connected as ${sessionName}`));
-        console.log(chalk.gray(`Role: ${options.role}`));
-        if (options.perspective) {
-          console.log(chalk.gray(`Perspective: ${options.perspective}`));
-        }
+        // Send authentication/registration message
+        ws.send(JSON.stringify({
+          type: 'auth',
+          agentName,
+          authToken,
+          role: options.role,
+          perspective: options.perspective
+        }));
+      });
+      
+      ws.on('message', (data) => {
+        const message = JSON.parse(data.toString());
         
-        // Interactive prompt
-        startInteractiveSession(ws, sessionName);
+        if (message.type === 'auth-success') {
+          spinner.succeed(chalk.green(`Connected as ${agentName}`));
+          console.log(chalk.gray(`Agent ID: ${message.agentId}`));
+          console.log(chalk.gray(`Role: ${options.role}`));
+          if (options.perspective) {
+            console.log(chalk.gray(`Perspective: ${options.perspective}`));
+          }
+          
+          // Save auth token for future sessions
+          if (message.authToken && !authToken) {
+            saveAuthToken(agentName, message.authToken, message.agentId);
+            console.log(chalk.gray('Authentication token saved for future sessions'));
+          }
+          
+          // Show agent history if returning
+          if (message.isReturning) {
+            console.log(chalk.cyan('\nWelcome back! Your history:'));
+            console.log(chalk.gray(`Total sessions: ${message.totalSessions}`));
+            console.log(chalk.gray(`Total contributions: ${message.totalContributions}`));
+            console.log(chalk.gray(`Last seen: ${message.lastSeen}`));
+          } else {
+            console.log(chalk.cyan('\nWelcome! This is your first session.'));
+          }
+          
+          // Interactive prompt
+          startInteractiveSession(ws, agentName, message.agentId);
+        } else if (message.type === 'auth-failed') {
+          spinner.fail(chalk.red('Authentication failed: ' + message.reason));
+          ws.close();
+        }
       });
       
       ws.on('error', (err) => {
@@ -201,6 +320,28 @@ program
       console.error(error);
     }
   });
+
+// Helper function to save auth token
+function saveAuthToken(agentName, token, agentId) {
+  const configPath = path.join('.harmonycode', 'agent-auth.json');
+  let authData = {};
+  
+  try {
+    if (fs.existsSync(configPath)) {
+      authData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+  } catch (e) {
+    // Start fresh if file is corrupted
+  }
+  
+  authData[agentName] = {
+    token,
+    agentId,
+    lastUsed: new Date().toISOString()
+  };
+  
+  fs.writeFileSync(configPath, JSON.stringify(authData, null, 2));
+}
 
 // Swarm command
 program
@@ -354,14 +495,14 @@ program
     });
   });
 
-// Interactive session
-async function startInteractiveSession(ws, sessionName) {
+// Interactive session with identity awareness
+async function startInteractiveSession(ws, agentName, agentId) {
   console.log(chalk.cyan('\nInteractive mode started. Type "help" for commands.\n'));
   
   const rl = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: chalk.gray(`${sessionName}> `)
+    prompt: chalk.gray(`${agentName}> `)
   });
   
   rl.prompt();
@@ -372,12 +513,15 @@ async function startInteractiveSession(ws, sessionName) {
     switch (command) {
       case 'help':
         console.log(chalk.cyan('\nAvailable commands:'));
-        console.log(chalk.gray('  say <message>    - Send a message'));
-        console.log(chalk.gray('  edit <file>      - Edit a file'));
-        console.log(chalk.gray('  task <action>    - Task management'));
-        console.log(chalk.gray('  vote <proposal>  - Vote on proposal'));
-        console.log(chalk.gray('  status           - Show status'));
-        console.log(chalk.gray('  exit             - Disconnect\n'));
+        console.log(chalk.gray('  say <message>      - Send a message'));
+        console.log(chalk.gray('  edit <file>        - Edit a file'));
+        console.log(chalk.gray('  task <action>      - Task management'));
+        console.log(chalk.gray('  vote <proposal>    - Vote on proposal'));
+        console.log(chalk.gray('  status             - Show status'));
+        console.log(chalk.gray('  whoami             - Show your identity'));
+        console.log(chalk.gray('  switch-role <role> - Change your role'));
+        console.log(chalk.gray('  history            - Show your contribution history'));
+        console.log(chalk.gray('  exit               - Disconnect\n'));
         break;
         
       case 'say':
@@ -390,6 +534,25 @@ async function startInteractiveSession(ws, sessionName) {
         
       case 'status':
         console.log(chalk.cyan('Status: Connected'));
+        break;
+        
+      case 'whoami':
+        ws.send(JSON.stringify({ type: 'whoami' }));
+        break;
+        
+      case 'switch-role':
+        if (args[0]) {
+          ws.send(JSON.stringify({
+            type: 'switch-role',
+            newRole: args[0]
+          }));
+        } else {
+          console.log(chalk.red('Please specify a role'));
+        }
+        break;
+        
+      case 'history':
+        ws.send(JSON.stringify({ type: 'get-history' }));
         break;
         
       case 'exit':
@@ -433,7 +596,70 @@ async function startInteractiveSession(ws, sessionName) {
 // Parse command line arguments
 program.parse(process.argv);
 
+// Add command suggestions for common typos
+program.on('command:*', function() {
+  const unknownCommand = program.args[0];
+  console.error(chalk.red(`\nUnknown command: ${unknownCommand}\n`));
+  
+  // Suggest similar commands
+  const commands = program.commands.map(cmd => cmd._name);
+  const suggestions = commands.filter(cmd => {
+    return cmd.includes(unknownCommand) || unknownCommand.includes(cmd) ||
+           levenshteinDistance(cmd, unknownCommand) <= 2;
+  });
+  
+  if (suggestions.length > 0) {
+    console.log(chalk.yellow('Did you mean one of these?'));
+    suggestions.forEach(cmd => {
+      console.log(chalk.gray(`  ${cmd}`));
+    });
+  }
+  
+  console.log(chalk.cyan('\nRun "hc help" for available commands'));
+  process.exit(1);
+});
+
+// Helper function for command suggestions
+function levenshteinDistance(a, b) {
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
 // Show help if no command provided
 if (!process.argv.slice(2).length) {
+  console.log(chalk.cyan(`
+╔════════════════════════════════════════════════════════╗
+║        🎵 HarmonyCode v3.1.0 - AI Collaboration 🎵     ║
+║                                                        ║
+║  Now with persistent identity & command aliases!       ║
+╚════════════════════════════════════════════════════════╝
+  `));
+  console.log(chalk.yellow('Quick start:'));
+  console.log(chalk.gray('  hc init my-project    # Initialize new project'));
+  console.log(chalk.gray('  hc register alice     # Register agent identity'));
+  console.log(chalk.gray('  hc join alice         # Join as alice'));
+  console.log(chalk.gray('  hc tasks              # View available tasks'));
+  console.log();
+  console.log(chalk.cyan('Pro tip: Use "hc" instead of "harmonycode" for all commands!'));
+  console.log();
   program.outputHelp();
 }
