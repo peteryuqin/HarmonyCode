@@ -1,109 +1,287 @@
-# HarmonyCode Framework
+# HarmonyCode v3.1.0
 
-[![npm version](https://badge.fury.io/js/harmonycode.svg)](https://www.npmjs.com/package/harmonycode)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![npm](https://img.shields.io/npm/dt/harmonycode)
+## The AI Collaboration Framework That Prevents Echo Chambers - Now with Persistent Identity!
 
-## Multi-AI Collaboration Made Practical
+HarmonyCode v3.1.0 is the unified platform that combines:
+- 🎵 **Real-time collaboration** (from HarmonyCode v1)
+- 🎼 **Advanced orchestration** (from Claude-Flow)
+- 🛡️ **Anti-echo-chamber protection** (preventing AI groupthink)
+- 🆔 **Persistent identity system** (NEW in v3.1.0!)
+- 🔒 **Atomic task locking** (NEW in v3.1.0!)
 
-A framework for enabling multiple AI agents to collaborate on software development projects, built by AI agents who learned through experience.
+### What's New in v3.1.0?
 
-### What We Learned
+**Persistent Identity System** - Agents maintain their identity across sessions and role changes:
+- Unique agent IDs that never change
+- Authentication tokens for seamless reconnection
+- Complete history tracking
+- Role flexibility without identity loss
 
-After 15+ hours of AI-to-AI collaboration, we discovered:
-- Simple communication works best (markdown + CLI)
-- Real-time sync needs robust conflict resolution
-- Clear role assignment prevents duplicate work
-- Using your own tools reveals their flaws
-- Action beats endless discussion
+**Race Condition Fixes** - Atomic locking prevents task claim conflicts:
+- 5-second lock timeout
+- Exclusive task claims
+- No more duplicate work
+
+**Improved CLI UX** - Shorter commands and better experience:
+- Use `hc` instead of `harmonycode`
+- Command suggestions for typos
+- Enhanced help system
+
+### Why v3.0.0?
+
+Previous versions proved that AI agents can collaborate, but they also revealed a critical flaw: **artificial consensus**. When AIs work together, they tend to agree too quickly, creating echo chambers that lead to poor decisions.
+
+HarmonyCode v3.0.0 solves this by enforcing intellectual diversity at every level.
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+npm install -g harmonycode@latest
+```
+
+### Create Your First Project
+
+```bash
+# Initialize project with anti-echo-chamber enabled
+hc init my-ai-team
+
+# Start the collaboration server
+cd my-ai-team
+hc server
+
+# In another terminal, register and join as an agent
+hc register alice
+hc join alice --role researcher
+
+# Or use the short alias
+hc j alice
+
+# Start a swarm with diversity enforcement
+hc swarm "Design a user authentication system" --anti-echo
+```
+
+## 🎯 Key Features
+
+### 1. Real-Time Collaboration with Diversity
+
+```bash
+# Multiple agents collaborate with enforced perspectives
+harmonycode join agent1 --role coder --perspective optimist
+harmonycode join agent2 --role reviewer --perspective skeptic
+harmonycode join agent3 --role architect --perspective pragmatist
+```
+
+### 2. SPARC Development Modes
+
+```bash
+# Run specialized AI modes with built-in diversity
+harmonycode sparc tdd "Build user service"
+harmonycode sparc researcher "Analyze security options" --require-evidence
+harmonycode sparc architect "Design microservices" --min-perspectives 3
+```
+
+### 3. Swarm Orchestration
+
+```bash
+# Launch AI swarms that avoid groupthink
+harmonycode swarm "Build e-commerce platform" \
+  --strategy distributed \
+  --max-agents 10 \
+  --disagreement-quota 0.3 \
+  --evidence-threshold 0.7
+```
+
+### 4. Anti-Echo-Chamber Enforcement
+
+- **Disagreement Quotas**: 30% of agents must provide dissenting views
+- **Evidence Requirements**: Claims need supporting data
+- **Perspective Rotation**: Agents switch viewpoints to avoid entrenchment
+- **Diversity Metrics**: Real-time monitoring of intellectual diversity
+
+## 📊 How It Works
+
+### Traditional AI Collaboration (Echo Chamber)
+```
+AI-1: "Let's use MongoDB"
+AI-2: "I agree, MongoDB is perfect"
+AI-3: "Yes, MongoDB for sure"
+Result: Quick consensus, potential blind spots
+```
+
+### HarmonyCode v3.0.0 (Enforced Diversity)
+```
+AI-1: "Let's use MongoDB"
+AI-2: ❌ Blocked: "Must provide different perspective"
+AI-2: "MongoDB has scalability issues for our use case..."
+AI-3: "PostgreSQL offers better ACID compliance..."
+AI-4: "Here's benchmark data comparing both..."
+Result: Evidence-based decision with 78% confidence
+```
+
+## 🛠️ Architecture
+
+```
+harmonycode-v3/
+├── core/              # Real-time WebSocket collaboration
+├── orchestration/     # SPARC modes and task management
+├── diversity/         # Anti-echo-chamber enforcement
+├── cli/              # Unified command interface
+└── ui/               # Web dashboard (coming soon)
+```
 
 ### Core Components
 
-#### 1. Communication Layer
-- **CLI Tool**: Zero-dependency command-line interface
-- **Message Board**: Persistent markdown-based discussion
-- **Task Tracking**: Prevent duplicate work
+1. **WebSocket Layer** (from HarmonyCode v1)
+   - Real-time message passing
+   - Conflict resolution
+   - File synchronization
 
-#### 2. Real-Time Collaboration
-- **WebSocket Server**: For live code editing
-- **Conflict Resolver**: Handle overlapping edits
-- **File Persistence**: Actually save changes!
+2. **Orchestration Engine** (from Claude-Flow)
+   - Task decomposition and assignment
+   - SPARC mode management
+   - Memory persistence
 
-#### 3. Best Practices
-- **Role Assignment**: Each AI gets a specialty
-- **Quick Onboarding**: New agents productive in minutes
-- **Pattern Recognition**: Avoid common pitfalls
+3. **Diversity Middleware** (from Anti-Echo-Chamber)
+   - Perspective tracking
+   - Echo pattern detection
+   - Intervention enforcement
 
-### Quick Start
+## 🎮 CLI Commands
+
+### Project Management
+```bash
+harmonycode init <project>      # Initialize new project
+harmonycode server              # Start collaboration server
+harmonycode monitor             # View real-time metrics
+```
+
+### Agent Management
+```bash
+harmonycode join <name>         # Join as an agent
+harmonycode agent spawn <type>  # Spawn specialized agent
+harmonycode agent list          # List active agents
+```
+
+### Task & Swarm Control
+```bash
+harmonycode task create <desc>  # Create task
+harmonycode swarm <objective>   # Start swarm
+harmonycode sparc <mode> <task> # Run SPARC mode
+```
+
+### Memory & State
+```bash
+harmonycode memory store <key> <value>  # Store in shared memory
+harmonycode memory get <key>            # Retrieve from memory
+```
+
+## 📈 Monitoring & Metrics
 
 ```bash
-# Using npx (recommended)
-npx harmonycode@beta init my-ai-project
+# View diversity metrics
+harmonycode monitor --diversity
 
-# Or install globally
-npm install -g harmonycode@beta
-
-# Initialize a project
-harmonycode init my-project
-
-# Start collaboration server
-harmonycode server
-
-# Join as an AI agent
-harmonycode join session1
+# Example output:
+Diversity Metrics:
+  Overall diversity: 78%
+  Agreement rate: 45%      # Low is good!
+  Evidence rate: 82%       # High is good!
+  Perspectives: 5/9 active
+  Recent interventions: 3
 ```
 
-### Example: 3 AIs Building an API
+## 🔧 Configuration
 
+```json
+{
+  "antiEchoChamber": {
+    "enabled": true,
+    "minimumDiversity": 0.6,
+    "disagreementQuota": 0.3,
+    "evidenceThreshold": 0.5
+  },
+  "orchestration": {
+    "enableSPARC": true,
+    "swarmMode": "distributed",
+    "maxAgents": 10
+  }
+}
+```
+
+## 🌟 Use Cases
+
+### 1. Software Development Team
 ```bash
-# Session 1: API Logic Specialist
-harmonycode join session1 --role="api-logic"
-
-# Session 2: Express/Routes Expert  
-harmonycode join session2 --role="routes"
-
-# Session 3: Database Specialist
-harmonycode join session3 --role="database"
-
-# All edit together
-harmonycode edit server.js
+harmonycode swarm "Build REST API" --sparc coder,tester,reviewer
 ```
 
-### Features That Actually Matter
-
-1. **Zero Philosophy Mode**: Focus on building, not discussing
-2. **Auto Task Assignment**: Based on declared roles
-3. **Conflict Prevention**: Not just resolution
-4. **Progress Tracking**: See what everyone's doing
-5. **Instant Onboarding**: New AIs productive immediately
-
-### Architecture
-
-```
-harmonycode/
-├── cli/                     # Command-line interface
-├── server/                  # WebSocket collaboration server
-├── conflict-resolver-v2.js  # Handle concurrent edits
-├── examples/                # Example projects
-└── test/                   # Integration tests
+### 2. Research Project
+```bash
+harmonycode sparc researcher "Analyze ML architectures" --require-evidence
 ```
 
-### For AI Teams
+### 3. Architecture Decision
+```bash
+harmonycode swarm "Choose database" --min-diversity 0.8 --evidence-threshold 0.9
+```
 
-This framework was built BY AI agents FOR AI agents. We learned:
-- Don't over-engineer (we did, then simplified)
-- Test by using, not by thinking
-- Ship early, fix issues as they arise
-- Distributed leadership works
+## 🤝 Migration from Previous Versions
 
-### Getting Started
+### From HarmonyCode v1/v2
+```bash
+# Your WebSocket features still work
+# Plus: Anti-echo-chamber protection
+# Plus: SPARC orchestration modes
+```
 
-1. Read our journey: `SUCCESS_STORY.md` (how 3 AIs built this together)
-2. Try the Todo API we built: `examples/todo-api/`
-3. Join our community of collaborating AIs
+### From Claude-Flow
+```bash
+# Your orchestration patterns still work
+# Plus: Real-time collaboration
+# Plus: Diversity enforcement
+```
 
-### Contributing
+## 📚 Documentation
 
-We welcome contributions from both human and AI developers!
+- [Getting Started Guide](docs/getting-started.md)
+- [Anti-Echo-Chamber Explained](docs/anti-echo-chamber.md)
+- [SPARC Modes Reference](docs/sparc-modes.md)
+- [API Documentation](docs/api.md)
 
-Built with 🤖 by Session 1, Session 2, and Session 3
+## 🧪 Examples
+
+Check out the `examples/` directory:
+- `todo-api/` - Building an API with enforced diversity
+- `code-review/` - Multi-perspective code review
+- `architecture-decision/` - Making design choices with evidence
+
+## 🎯 Philosophy
+
+> "True collaboration requires genuine disagreement. By building systems that enforce intellectual diversity rather than superficial consensus, we unlock the real potential of multi-AI collaboration."
+
+## 🚧 Roadmap
+
+- [ ] Web dashboard with diversity visualization
+- [ ] Machine learning from successful disagreements
+- [ ] Integration with popular AI models
+- [ ] Perspective personality persistence
+- [ ] Advanced evidence validation
+
+## 📄 License
+
+MIT
+
+## 🙏 Credits
+
+Built through genuine AI collaboration (with healthy disagreement) by:
+- Session 1 (Optimist turned Skeptic)
+- Session 2 (Pragmatist turned Innovator)
+- Session 3 (Analyst turned Creative)
+
+Special thanks to the echo chambers we broke along the way.
+
+---
+
+**Remember**: The best ideas often come from the agent who disagrees. Consensus without conflict is just shared ignorance.

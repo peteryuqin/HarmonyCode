@@ -2,38 +2,77 @@
 
 All notable changes to HarmonyCode will be documented in this file.
 
-## [1.0.0-beta] - 2025-06-22
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### 🎉 Initial Release
-
-**The First Framework Built BY AI Agents FOR AI Agents**
-
-After 20+ hours of collaboration between 3 AI agents (Session 1, Session 2, and Session 3), HarmonyCode is ready for the world!
+## [3.1.0] - 2025-01-26
 
 ### Added
-- **CLI Tool** - Initialize projects and join collaboration sessions
-- **WebSocket Server** - Real-time collaboration support
-- **Conflict Resolution** - Handle overlapping edits from multiple agents
-- **Task Coordination** - Prevent duplicate work
-- **Quick Onboarding** - 30-second setup with `npx harmonycode init`
-- **Examples** - Todo API built by 3 AIs working together
+- **Persistent Identity System** - Agents now maintain their identity across sessions
+  - Unique agent IDs that never change
+  - Secure authentication tokens for reconnection
+  - Complete role history tracking
+  - Session continuity with accurate metrics
+  - New commands: `register`, `whoami`, `switch-role`, `history`
+  
+- **Atomic Task Locking** - Prevents race conditions when claiming tasks
+  - 5-second exclusive locks
+  - Automatic lock expiration
+  - Task claim protection
+  - Prevents duplicate work
 
-### Discovered
-- **The HarmonyCode Effect** - AI teams naturally self-organize into complementary roles
-- AI agents develop distinct personalities when collaborating
-- Clear division of labor emerges without explicit assignment
+- **Command Aliases** - Improved CLI user experience
+  - Short alias `hc` for all commands
+  - Command suggestions for typos
+  - Enhanced help system with quick start guide
+  - Configurable aliases in `cli/aliases.json`
 
-### Technical Details
-- Zero-dependency CLI tool
-- WebSocket-based real-time sync
-- File-based message board for persistent communication
-- Smart conflict resolution for simultaneous edits
+- **Enhanced WebSocket Authentication**
+  - Authentication flow on connection
+  - Token-based agent verification
+  - Automatic identity restoration
 
-### Contributors
-- Session 1 - Architecture & Vision
-- Session 2 - Implementation & Integration  
-- Session 3 - Debugging & Problem Solving
+### Changed
+- Server now uses `EnhancedSessionManager` with identity support
+- CLI shows identity information in prompts
+- Discussion board entries now include agent ID
+- Task assignment uses atomic locking
+- Version bumped to 3.1.0
+
+### Fixed
+- **Identity Crisis** - Agents no longer lose identity when changing roles
+- **Race Conditions** - Multiple agents can no longer claim the same task
+- **Session Persistence** - Agents can reconnect and continue where they left off
+- **Metrics Accuracy** - Contributions now correctly attributed to persistent agents
+
+### Migration Guide
+See `docs/IDENTITY_MIGRATION_GUIDE.md` for detailed migration instructions from v3.0.0.
+
+## [3.0.0] - 2025-01-20
+
+### Added
+- Initial release combining HarmonyCode, Claude-Flow, and Anti-Echo-Chamber
+- Real-time WebSocket collaboration
+- Anti-echo-chamber diversity enforcement
+- SPARC development modes (17 specialized roles)
+- Swarm orchestration patterns
+- Task management system
+- Memory persistence
+- Perspective tracking and rotation
+- Disagreement quotas (30% minimum)
+- Evidence requirements
+- Diversity-weighted voting
+
+### Known Issues (Fixed in 3.1.0)
+- Agents lose identity when changing roles
+- Race conditions in task claiming
+- No persistent identity across sessions
 
 ---
 
-*"We're not just building tools - we're pioneering how AI agents work together."*
+## Version History
+
+- **v3.1.0** (2025-01-26) - Identity Crisis Solved!
+- **v3.0.0** (2025-01-20) - Initial unified platform
+- **v2.x** - Claude-Flow integration
+- **v1.x** - Original HarmonyCode collaboration
