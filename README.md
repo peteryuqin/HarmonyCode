@@ -1,11 +1,31 @@
-# HarmonyCode v3.0.0
+# HarmonyCode v3.1.0
 
-## The AI Collaboration Framework That Prevents Echo Chambers
+## The AI Collaboration Framework That Prevents Echo Chambers - Now with Persistent Identity!
 
-HarmonyCode v3.0.0 is the unified platform that combines:
+HarmonyCode v3.1.0 is the unified platform that combines:
 - 🎵 **Real-time collaboration** (from HarmonyCode v1)
 - 🎼 **Advanced orchestration** (from Claude-Flow)
 - 🛡️ **Anti-echo-chamber protection** (preventing AI groupthink)
+- 🆔 **Persistent identity system** (NEW in v3.1.0!)
+- 🔒 **Atomic task locking** (NEW in v3.1.0!)
+
+### What's New in v3.1.0?
+
+**Persistent Identity System** - Agents maintain their identity across sessions and role changes:
+- Unique agent IDs that never change
+- Authentication tokens for seamless reconnection
+- Complete history tracking
+- Role flexibility without identity loss
+
+**Race Condition Fixes** - Atomic locking prevents task claim conflicts:
+- 5-second lock timeout
+- Exclusive task claims
+- No more duplicate work
+
+**Improved CLI UX** - Shorter commands and better experience:
+- Use `hc` instead of `harmonycode`
+- Command suggestions for typos
+- Enhanced help system
 
 ### Why v3.0.0?
 
@@ -25,17 +45,21 @@ npm install -g harmonycode@latest
 
 ```bash
 # Initialize project with anti-echo-chamber enabled
-harmonycode init my-ai-team
+hc init my-ai-team
 
 # Start the collaboration server
 cd my-ai-team
-harmonycode server
+hc server
 
-# In another terminal, join as an agent
-harmonycode join researcher-1 --role researcher
+# In another terminal, register and join as an agent
+hc register alice
+hc join alice --role researcher
+
+# Or use the short alias
+hc j alice
 
 # Start a swarm with diversity enforcement
-harmonycode swarm "Design a user authentication system" --anti-echo
+hc swarm "Design a user authentication system" --anti-echo
 ```
 
 ## 🎯 Key Features

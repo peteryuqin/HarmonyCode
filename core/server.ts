@@ -9,8 +9,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DiversityMiddleware } from '../diversity/middleware';
 import { OrchestrationEngine } from '../orchestration/engine';
-import { SessionManager } from './session-manager';
+import { EnhancedSessionManager } from './session-manager-enhanced';
+import { IdentityManager } from './identity-manager';
 import { MessageRouter } from './message-router';
+import { RealtimeEnhancer } from './realtime-enhancer';
 
 export interface ServerConfig {
   port: number;
@@ -30,20 +32,28 @@ export interface ServerConfig {
 export class HarmonyCodeServer extends EventEmitter {
   private wss!: WebSocketServer;
   private config: ServerConfig;
-  private sessions: SessionManager;
+  private sessions: EnhancedSessionManager;
+  private identityManager: IdentityManager;
   private router: MessageRouter;
   private diversity: DiversityMiddleware;
   private orchestration: OrchestrationEngine;
+  private realtimeEnhancer: RealtimeEnhancer;
   private projectPath: string;
 
   constructor(config: ServerConfig = { port: 8765, enableAntiEcho: true }) {
     super();
     this.config = config;
-    this.sessions = new SessionManager();
+    this.projectPath = process.cwd();
+    this.identityManager = new IdentityManager(path.join(this.projectPath, '.harmonycode'));
+    this.sessions = new EnhancedSessionManager(this.identityManager);
     this.router = new MessageRouter();
     this.diversity = new DiversityMiddleware(config.diversityConfig);
     this.orchestration = new OrchestrationEngine(config.orchestrationConfig);
-    this.projectPath = process.cwd();
+    this.realtimeEnhancer = new RealtimeEnhancer({
+      watchPaths: [path.join(this.projectPath, '.harmonycode')],
+      enableNotifications: true,
+      enableLiveCursors: true
+    });
     
     // Connect components
     this.diversity.on('intervention', this.handleDiversityIntervention.bind(this));
@@ -58,9 +68,9 @@ export class HarmonyCodeServer extends EventEmitter {
     
     console.log(`
 ╔════════════════════════════════════════════════════════╗
-║           🎵 HarmonyCode v3.0.0 Server 🎵              ║
+║           🎵 HarmonyCode v3.1.0 Server 🎵              ║
 ║                                                        ║
-║  Real-time collaboration with diversity enforcement     ║
+║  Real-time collaboration with persistent identity      ║
 ║  Anti-echo-chamber: ${this.config.enableAntiEcho ? 'ENABLED ✓' : 'DISABLED'}                           ║
 ╚════════════════════════════════════════════════════════╝
     `);
@@ -77,6 +87,10 @@ export class HarmonyCodeServer extends EventEmitter {
     // Start orchestration engine
     await this.orchestration.initialize();
     
+    // Start real-time file watching
+    this.realtimeEnhancer.startWatching();
+    this.setupRealtimeHandlers();
+    
     // Monitor diversity metrics
     if (this.config.enableAntiEcho) {
       this.startDiversityMonitoring();
@@ -84,42 +98,109 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
-   * Handle new WebSocket connection
+   * Handle new WebSocket connection with identity support
    */
   private handleConnection(ws: WebSocket, req: any): void {
-    const sessionId = this.extractSessionId(req.url);
-    const session = this.sessions.createSession(sessionId, ws);
+    const sessionId = this.generateSessionId();
     
-    console.log(`✅ ${session.name} connected (${session.role})`);
-    
-    // Send welcome message with capabilities
-    ws.send(JSON.stringify({
-      type: 'welcome',
-      sessionId: session.id,
-      serverVersion: '3.0.0',
-      capabilities: {
-        realtime: true,
-        orchestration: true,
-        antiEchoChamber: this.config.enableAntiEcho,
-        sparcModes: this.orchestration.getAvailableModes(),
-        perspective: session.perspective
+    // Don't create session yet - wait for authentication
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        if (message.type === 'auth') {
+          await this.handleAuthentication(ws, sessionId, message);
+        } else {
+          // Reject non-auth messages from unauthenticated connections
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Authentication required. Send auth message first.'
+          }));
+        }
+      } catch (error) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Invalid message format'
+        }));
       }
-    }));
+    });
     
-    // Assign perspective if anti-echo enabled
-    if (this.config.enableAntiEcho) {
-      const perspective = this.diversity.assignPerspective(session.id);
-      session.perspective = perspective;
-      console.log(`   Assigned perspective: ${perspective}`);
+    ws.on('error', (error) => console.error('WebSocket error:', error));
+  }
+  
+  /**
+   * Handle agent authentication
+   */
+  private async handleAuthentication(ws: WebSocket, sessionId: string, authMessage: any): Promise<void> {
+    try {
+      const { agentName, authToken, role = 'general', perspective } = authMessage;
+      
+      // Create or authenticate session
+      const session = this.sessions.createSession(
+        sessionId,
+        ws,
+        authToken,
+        agentName,
+        role
+      );
+      
+      const agentIdentity = session.agentIdentity;
+      const isReturning = agentIdentity.stats.totalSessions > 1;
+      
+      console.log(`✅ ${agentIdentity.displayName} connected (${session.currentRole})`);
+      console.log(`   Agent ID: ${agentIdentity.agentId}`);
+      if (isReturning) {
+        console.log(`   Welcome back! Sessions: ${agentIdentity.stats.totalSessions}`);
+      }
+      
+      // Send auth success with identity info
+      ws.send(JSON.stringify({
+        type: 'auth-success',
+        agentId: agentIdentity.agentId,
+        authToken: agentIdentity.authToken,
+        isReturning,
+        totalSessions: agentIdentity.stats.totalSessions,
+        totalContributions: agentIdentity.stats.totalMessages + agentIdentity.stats.totalTasks + agentIdentity.stats.totalEdits,
+        lastSeen: agentIdentity.lastSeen,
+        serverVersion: '3.1.0',
+        capabilities: {
+          realtime: true,
+          orchestration: true,
+          antiEchoChamber: this.config.enableAntiEcho,
+          persistentIdentity: true,
+          sparcModes: this.orchestration.getAvailableModes()
+        }
+      }));
+      
+      // Assign perspective if anti-echo enabled
+      if (this.config.enableAntiEcho && perspective) {
+        this.sessions.changeSessionPerspective(sessionId, perspective);
+        console.log(`   Assigned perspective: ${perspective}`);
+      } else if (this.config.enableAntiEcho) {
+        const assignedPerspective = this.diversity.assignPerspective(sessionId);
+        this.sessions.changeSessionPerspective(sessionId, assignedPerspective);
+        console.log(`   Assigned perspective: ${assignedPerspective}`);
+      }
+      
+      // Set up authenticated message handlers
+      ws.removeAllListeners('message');
+      ws.on('message', (data) => this.handleMessage(session, data));
+      ws.on('close', () => this.handleDisconnect(session));
+      
+      // Set up real-time update stream for this session
+      this.realtimeEnhancer.createUpdateStream(ws);
+      
+      // Notify other sessions
+      this.broadcastSessionUpdate('joined', session);
+      
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      ws.send(JSON.stringify({
+        type: 'auth-failed',
+        reason: error.message || 'Authentication failed'
+      }));
+      ws.close();
     }
-    
-    // Set up message handlers
-    ws.on('message', (data) => this.handleMessage(session, data));
-    ws.on('close', () => this.handleDisconnect(session));
-    ws.on('error', (error) => this.handleError(session, error));
-    
-    // Notify other sessions
-    this.broadcastSessionUpdate('joined', session);
   }
 
   /**
@@ -164,10 +245,14 @@ export class HarmonyCodeServer extends EventEmitter {
       switch (message.type) {
         case 'edit':
           await this.handleEdit(session, message);
+          this.sessions.incrementSessionMetric(session.id, 'edits');
           break;
           
         case 'task':
           await this.handleTask(session, message);
+          if (message.action === 'create' || message.action === 'complete') {
+            this.sessions.incrementSessionMetric(session.id, 'tasks');
+          }
           break;
           
         case 'vote':
@@ -176,10 +261,23 @@ export class HarmonyCodeServer extends EventEmitter {
           
         case 'message':
           await this.handleChatMessage(session, message);
+          this.sessions.incrementSessionMetric(session.id, 'messages');
           break;
           
         case 'spawn':
           await this.handleSpawnRequest(session, message);
+          break;
+          
+        case 'whoami':
+          await this.handleWhoAmI(session);
+          break;
+          
+        case 'switch-role':
+          await this.handleRoleSwitch(session, message);
+          break;
+          
+        case 'get-history':
+          await this.handleGetHistory(session);
           break;
           
         default:
@@ -423,6 +521,57 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
+   * Set up real-time event handlers
+   */
+  private setupRealtimeHandlers(): void {
+    // Handle task board updates
+    this.realtimeEnhancer.on('task-board-updated', (event) => {
+      console.log('📋 Task board updated - notifying all sessions');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'task-board',
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle discussion updates
+    this.realtimeEnhancer.on('discussion-updated', (event) => {
+      console.log('💬 Discussion board updated - notifying all sessions');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'discussion',
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle new messages
+    this.realtimeEnhancer.on('new-message', (event) => {
+      console.log('📨 New message detected');
+      this.broadcast({
+        type: 'realtime-update',
+        updateType: 'new-message',
+        filename: event.filename,
+        timestamp: event.timestamp
+      });
+    });
+    
+    // Handle concurrent editing notifications
+    this.realtimeEnhancer.on('concurrent-editing', (data) => {
+      console.log(`⚠️  Multiple editors on ${data.filepath}`);
+      data.editors.forEach(editorId => {
+        const session = this.sessions.getSession(editorId);
+        if (session) {
+          session.ws.send(JSON.stringify({
+            type: 'concurrent-editing-warning',
+            filepath: data.filepath,
+            otherEditors: data.editors.filter(id => id !== editorId)
+          }));
+        }
+      });
+    });
+  }
+
+  /**
    * Broadcast message to all or specific sessions
    */
   private broadcast(message: any, excludeSessionId?: string): void {
@@ -455,9 +604,10 @@ export class HarmonyCodeServer extends EventEmitter {
       event,
       session: {
         id: session.id,
-        name: session.name,
-        role: session.role,
-        perspective: session.perspective
+        agentId: session.agentId,
+        displayName: session.agentIdentity.displayName,
+        role: session.currentRole,
+        perspective: session.currentPerspective
       }
     }, session.id);
   }
@@ -466,9 +616,10 @@ export class HarmonyCodeServer extends EventEmitter {
    * Handle chat messages
    */
   private async handleChatMessage(session: any, message: any): Promise<void> {
-    // Add to discussion board
+    // Add to discussion board with identity info
     const boardPath = path.join(this.projectPath, '.harmonycode', 'DISCUSSION_BOARD.md');
-    const entry = `\n## ${session.name} (${session.perspective || 'No perspective'})\n${new Date().toISOString()}\n\n${message.text}\n\n---\n`;
+    const identity = session.agentIdentity;
+    const entry = `\n## ${identity.displayName} (${session.currentRole})\n**Agent ID**: ${identity.agentId}\n**Perspective**: ${session.currentPerspective || 'None'}\n**Time**: ${new Date().toISOString()}\n\n${message.text}\n\n---\n`;
     
     fs.appendFileSync(boardPath, entry);
     
@@ -476,8 +627,10 @@ export class HarmonyCodeServer extends EventEmitter {
     this.broadcast({
       type: 'chat',
       sessionId: session.id,
-      sessionName: session.name,
-      perspective: session.perspective,
+      agentId: session.agentId,
+      displayName: identity.displayName,
+      role: session.currentRole,
+      perspective: session.currentPerspective,
       text: message.text,
       timestamp: Date.now()
     }, session.id);
@@ -520,11 +673,85 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
-   * Extract session ID from WebSocket URL
+   * Handle identity query
+   */
+  private async handleWhoAmI(session: any): Promise<void> {
+    const identity = session.agentIdentity;
+    session.ws.send(JSON.stringify({
+      type: 'identity-info',
+      agentId: identity.agentId,
+      displayName: identity.displayName,
+      currentRole: session.currentRole,
+      currentPerspective: session.currentPerspective,
+      stats: identity.stats,
+      roleHistory: identity.roleHistory,
+      firstSeen: identity.firstSeen,
+      sessionInfo: {
+        sessionId: session.id,
+        joinedAt: session.joinedAt,
+        sessionContributions: {
+          messages: session.sessionMessages,
+          edits: session.sessionEdits,
+          tasks: session.sessionTasks
+        }
+      }
+    }));
+  }
+  
+  /**
+   * Handle role switch request
+   */
+  private async handleRoleSwitch(session: any, message: any): Promise<void> {
+    const { newRole } = message;
+    
+    if (!newRole) {
+      session.ws.send(JSON.stringify({
+        type: 'error',
+        message: 'New role required'
+      }));
+      return;
+    }
+    
+    this.sessions.changeSessionRole(session.id, newRole);
+    
+    session.ws.send(JSON.stringify({
+      type: 'role-changed',
+      oldRole: session.currentRole,
+      newRole: newRole,
+      agentId: session.agentId
+    }));
+    
+    console.log(`🔄 ${session.agentIdentity.displayName} switched role from ${session.currentRole} to ${newRole}`);
+    
+    // Notify others
+    this.broadcastSessionUpdate('role-changed', session);
+  }
+  
+  /**
+   * Handle history request
+   */
+  private async handleGetHistory(session: any): Promise<void> {
+    const report = this.sessions.getAgentSessionHistory(session.agentId);
+    
+    session.ws.send(JSON.stringify({
+      type: 'history-report',
+      report
+    }));
+  }
+  
+  /**
+   * Generate unique session ID
+   */
+  private generateSessionId(): string {
+    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  /**
+   * Extract session ID from WebSocket URL (deprecated)
    */
   private extractSessionId(url: string): string {
     const match = url?.match(/\/(.+)$/);
-    return match ? match[1] : `agent-${Date.now()}`;
+    return match ? match[1] : this.generateSessionId();
   }
 
   /**
@@ -536,6 +763,9 @@ export class HarmonyCodeServer extends EventEmitter {
     // Save state
     await this.orchestration.saveState();
     await this.diversity.saveMetrics();
+    
+    // Stop real-time watchers
+    this.realtimeEnhancer.destroy();
     
     // Close connections
     this.sessions.getAllSessions().forEach(session => {
