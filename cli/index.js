@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name('harmonycode')
   .description('The AI collaboration framework that prevents echo chambers')
-  .version('3.0.0');
+  .version('3.1.0');
 
 // Initialize project
 program
@@ -51,7 +51,7 @@ program
       // Create config file
       const config = {
         project: projectName,
-        version: '3.0.0',
+        version: '3.1.0',
         antiEchoChamber: {
           enabled: options.antiEcho,
           minimumDiversity: 0.6,
