@@ -41,6 +41,7 @@ exports.OrchestrationEngine = void 0;
 const events_1 = require("events");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const task_lock_manager_1 = require("./task-lock-manager");
 class OrchestrationEngine extends events_1.EventEmitter {
     constructor(config) {
         super();
@@ -59,6 +60,7 @@ class OrchestrationEngine extends events_1.EventEmitter {
             ...config
         };
         this.projectPath = process.cwd();
+        this.taskLockManager = new task_lock_manager_1.TaskLockManager(path.join(this.projectPath, '.harmonycode'));
     }
     /**
      * Initialize orchestration engine
@@ -133,7 +135,7 @@ class OrchestrationEngine extends events_1.EventEmitter {
         return task;
     }
     /**
-     * Assign task to agent
+     * Assign task to agent with atomic locking
      */
     async assignTask(taskId, agentId) {
         const task = this.tasks.get(taskId);
@@ -144,17 +146,39 @@ class OrchestrationEngine extends events_1.EventEmitter {
         if (agent.status === 'busy') {
             throw new Error('Agent is busy');
         }
-        task.assignedTo = agentId;
-        task.status = 'in-progress';
-        agent.currentTask = taskId;
-        agent.status = 'busy';
-        this.emit('taskAssigned', { task, agent });
-        // Set timeout
-        setTimeout(() => {
-            if (task.status === 'in-progress') {
-                this.handleTaskTimeout(taskId);
+        // Check if task is available
+        if (!this.taskLockManager.isTaskAvailable(taskId)) {
+            throw new Error('Task is not available - already locked or claimed');
+        }
+        // Try to acquire lock
+        const lockToken = this.taskLockManager.acquireLock(taskId, agentId);
+        if (!lockToken) {
+            throw new Error('Failed to acquire task lock - another agent is claiming this task');
+        }
+        try {
+            // Claim the task with lock protection
+            const claimed = this.taskLockManager.claimTask(taskId, agentId, lockToken);
+            if (!claimed) {
+                throw new Error('Failed to claim task - may already be claimed');
             }
-        }, this.config.taskTimeout);
+            // Update internal state
+            task.assignedTo = agentId;
+            task.status = 'in-progress';
+            agent.currentTask = taskId;
+            agent.status = 'busy';
+            this.emit('taskAssigned', { task, agent });
+            // Set timeout
+            setTimeout(() => {
+                if (task.status === 'in-progress') {
+                    this.handleTaskTimeout(taskId);
+                }
+            }, this.config.taskTimeout);
+        }
+        catch (error) {
+            // Release lock if claiming fails
+            this.taskLockManager.releaseLock(taskId, lockToken);
+            throw error;
+        }
     }
     /**
      * Apply edit with conflict detection
@@ -256,6 +280,8 @@ class OrchestrationEngine extends events_1.EventEmitter {
      * Save orchestration state
      */
     async saveState() {
+        // Cleanup task lock manager before saving
+        this.taskLockManager.destroy();
         const state = {
             tasks: Array.from(this.tasks.entries()),
             agents: Array.from(this.agents.entries()),
@@ -314,7 +340,17 @@ class OrchestrationEngine extends events_1.EventEmitter {
                 await this.createTask(data);
                 break;
             case 'claim':
-                await this.assignTask(data.taskId, sessionId);
+                try {
+                    await this.assignTask(data.taskId, sessionId);
+                }
+                catch (error) {
+                    // Emit error event for the session to handle
+                    this.emit('taskClaimError', {
+                        sessionId,
+                        taskId: data.taskId,
+                        error: error.message
+                    });
+                }
                 break;
             case 'complete':
                 await this.completeTask(data.taskId, data.result);
@@ -396,12 +432,22 @@ class OrchestrationEngine extends events_1.EventEmitter {
      * Auto-assign task based on agent capabilities
      */
     async autoAssignTask(task) {
+        // Only auto-assign if task is available
+        if (!this.taskLockManager.isTaskAvailable(task.id)) {
+            return;
+        }
         const availableAgents = Array.from(this.agents.values())
             .filter(a => a.status === 'idle' && this.canHandleTask(a, task));
         if (availableAgents.length > 0) {
             // Select best agent based on mode and capabilities
             const bestAgent = this.selectBestAgent(availableAgents, task);
-            await this.assignTask(task.id, bestAgent.id);
+            try {
+                await this.assignTask(task.id, bestAgent.id);
+            }
+            catch (error) {
+                // Another agent may have claimed it - that's ok
+                console.log(`Auto-assign failed for task ${task.id}: ${error}`);
+            }
         }
     }
     /**
@@ -458,6 +504,11 @@ class OrchestrationEngine extends events_1.EventEmitter {
         const task = this.tasks.get(taskId);
         if (!task)
             return;
+        // Update task lock status
+        const agentId = task.assignedTo;
+        if (agentId) {
+            this.taskLockManager.updateTaskStatus(taskId, agentId, 'completed');
+        }
         task.status = 'completed';
         task.result = result;
         const agent = this.agents.get(task.assignedTo);

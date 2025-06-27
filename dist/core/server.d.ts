@@ -21,9 +21,11 @@ export declare class HarmonyCodeServer extends EventEmitter {
     private wss;
     private config;
     private sessions;
+    private identityManager;
     private router;
     private diversity;
     private orchestration;
+    private realtimeEnhancer;
     private projectPath;
     constructor(config?: ServerConfig);
     /**
@@ -31,9 +33,13 @@ export declare class HarmonyCodeServer extends EventEmitter {
      */
     start(): Promise<void>;
     /**
-     * Handle new WebSocket connection
+     * Handle new WebSocket connection with identity support
      */
     private handleConnection;
+    /**
+     * Handle agent authentication
+     */
+    private handleAuthentication;
     /**
      * Handle incoming message with diversity checks
      */
@@ -67,6 +73,10 @@ export declare class HarmonyCodeServer extends EventEmitter {
      */
     private initializeProjectStructure;
     /**
+     * Set up real-time event handlers
+     */
+    private setupRealtimeHandlers;
+    /**
      * Broadcast message to all or specific sessions
      */
     private broadcast;
@@ -99,7 +109,23 @@ export declare class HarmonyCodeServer extends EventEmitter {
      */
     private shouldOrchestrate;
     /**
-     * Extract session ID from WebSocket URL
+     * Handle identity query
+     */
+    private handleWhoAmI;
+    /**
+     * Handle role switch request
+     */
+    private handleRoleSwitch;
+    /**
+     * Handle history request
+     */
+    private handleGetHistory;
+    /**
+     * Generate unique session ID
+     */
+    private generateSessionId;
+    /**
+     * Extract session ID from WebSocket URL (deprecated)
      */
     private extractSessionId;
     /**

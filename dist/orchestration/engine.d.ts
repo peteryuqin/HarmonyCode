@@ -56,6 +56,7 @@ export declare class OrchestrationEngine extends EventEmitter {
     private memory;
     private workflowState;
     private projectPath;
+    private taskLockManager;
     constructor(config?: OrchestrationConfig);
     /**
      * Initialize orchestration engine
@@ -74,7 +75,7 @@ export declare class OrchestrationEngine extends EventEmitter {
      */
     createTask(taskData: Partial<Task>): Promise<Task>;
     /**
-     * Assign task to agent
+     * Assign task to agent with atomic locking
      */
     assignTask(taskId: string, agentId: string): Promise<void>;
     /**
