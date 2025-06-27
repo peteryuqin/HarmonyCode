@@ -255,8 +255,7 @@ export class TaskLockManager extends EventEmitter {
   private saveLocks(): void {
     try {
       const data = {
-        locks: Array.from(this.locks.entries()).map(([taskId, lock]) => ({
-          taskId,
+        locks: Array.from(this.locks.entries()).map(([_, lock]) => ({
           ...lock,
           lockedAt: lock.lockedAt.toISOString(),
           expiresAt: lock.expiresAt.toISOString()
@@ -309,8 +308,7 @@ export class TaskLockManager extends EventEmitter {
     try {
       const claimsPath = path.join(path.dirname(this.persistPath), 'task-claims.json');
       const data = {
-        claims: Array.from(this.claims.entries()).map(([taskId, claim]) => ({
-          taskId,
+        claims: Array.from(this.claims.entries()).map(([_, claim]) => ({
           ...claim,
           claimedAt: claim.claimedAt.toISOString()
         })),

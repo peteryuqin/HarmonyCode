@@ -460,7 +460,7 @@ export class HarmonyCodeServer extends EventEmitter {
       }));
       
       // Log intervention
-      console.log(`🚨 Diversity intervention for ${session.name}: ${intervention.reason}`);
+      console.log(`🚨 Diversity intervention for ${session.agentIdentity.displayName}: ${intervention.reason}`);
     }
   }
 
@@ -558,13 +558,13 @@ export class HarmonyCodeServer extends EventEmitter {
     // Handle concurrent editing notifications
     this.realtimeEnhancer.on('concurrent-editing', (data) => {
       console.log(`⚠️  Multiple editors on ${data.filepath}`);
-      data.editors.forEach(editorId => {
+      data.editors.forEach((editorId: string) => {
         const session = this.sessions.getSession(editorId);
         if (session) {
           session.ws.send(JSON.stringify({
             type: 'concurrent-editing-warning',
             filepath: data.filepath,
-            otherEditors: data.editors.filter(id => id !== editorId)
+            otherEditors: data.editors.filter((id: string) => id !== editorId)
           }));
         }
       });
