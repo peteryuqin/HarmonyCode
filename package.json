@@ -4,8 +4,8 @@
   "description": "The AI collaboration framework that prevents echo chambers - Real-time collaboration with diversity enforcement",
   "main": "dist/index.js",
   "bin": {
-    "harmonycode": "./cli/index.js",
-    "hc": "./bin/hc"
+    "harmonycode": "cli/index.js",
+    "hc": "bin/hc"
   },
   "scripts": {
     "build": "tsc",
@@ -37,7 +37,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/peteryuqin/harmonycode"
+    "url": "git+https://github.com/peteryuqin/harmonycode.git"
   },
   "dependencies": {
     "chalk": "^4.1.2",
