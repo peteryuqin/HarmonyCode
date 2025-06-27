@@ -1,7 +1,7 @@
 /**
- * HarmonyCode v3.1.0 - Identity Manager
+ * HarmonyCode v3.2.0 - Identity Manager
  * Implements persistent agent identity separate from roles and sessions
- * Fixes the critical identity crisis issue from user feedback
+ * Enhanced with unique name enforcement and session cleanup (v3.2)
  */
 import { PerspectiveProfile } from '../diversity/types';
 export interface AgentIdentity {
@@ -15,6 +15,7 @@ export interface AgentIdentity {
     perspectiveHistory: PerspectiveTransition[];
     stats: AgentStats;
     currentSessionId?: string;
+    lastActivityTime?: Date;
     authToken: string;
 }
 export interface RoleTransition {
@@ -40,6 +41,7 @@ export declare class IdentityManager {
     private identities;
     private tokenToAgent;
     private sessionToAgent;
+    private nameToAgent;
     private persistPath;
     constructor(workspacePath?: string);
     /**
@@ -75,10 +77,6 @@ export declare class IdentityManager {
      */
     getAgentById(agentId: string): AgentIdentity | null;
     /**
-     * Find agent by display name
-     */
-    private findAgentByDisplayName;
-    /**
      * Update agent statistics
      */
     updateAgentStats(agentId: string, updates: Partial<AgentStats>): void;
@@ -94,6 +92,42 @@ export declare class IdentityManager {
      * Get agent history report
      */
     getAgentHistoryReport(agentId: string): string;
+    /**
+     * Find agent by display name (v3.2)
+     */
+    findAgentByDisplayName(displayName: string): AgentIdentity | null;
+    /**
+     * Check if a display name is available (v3.2)
+     */
+    isNameAvailable(displayName: string): boolean;
+    /**
+     * Get or create agent with unique name enforcement (v3.2)
+     */
+    getOrCreateAgent(displayName: string, role?: string, authToken?: string): AgentIdentity;
+    /**
+     * Create new agent with unique name (v3.2)
+     */
+    createNewAgent(displayName: string, role: string): AgentIdentity;
+    /**
+     * Get name suggestions when a name is taken (v3.2)
+     */
+    getNameSuggestions(baseName: string, count?: number): string[];
+    /**
+     * Update agent activity time (v3.2)
+     */
+    updateAgentActivity(agentId: string): void;
+    /**
+     * Clean up inactive sessions (v3.2)
+     */
+    cleanupInactiveSessions(timeoutMs?: number): number;
+    /**
+     * Get session activity report (v3.2)
+     */
+    getSessionActivityReport(): {
+        active: number;
+        inactive: number;
+        total: number;
+    };
     /**
      * Generate unique agent ID
      */

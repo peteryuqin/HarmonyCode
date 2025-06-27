@@ -12,10 +12,17 @@ describe('IdentityManager', () => {
   const testWorkspace = '.test-harmonycode';
   
   beforeEach(() => {
-    // Create test workspace
+    // Create test workspace with proper permissions
     if (!fs.existsSync(testWorkspace)) {
       fs.mkdirSync(testWorkspace, { recursive: true });
     }
+    
+    // Ensure the directory is writable and clear any existing identities
+    const identitiesPath = path.join(testWorkspace, 'identities.json');
+    if (fs.existsSync(identitiesPath)) {
+      fs.unlinkSync(identitiesPath);
+    }
+    
     identityManager = new IdentityManager(testWorkspace);
   });
   
@@ -45,12 +52,16 @@ describe('IdentityManager', () => {
       expect(agent.firstSeen).toBeInstanceOf(Date);
     });
     
-    it('should return existing agent if display name already exists', () => {
+    it('should create new agent even if display name exists (v3.2 behavior change)', () => {
       const agent1 = identityManager.registerAgent('alice', 'coder');
       const agent2 = identityManager.registerAgent('alice', 'reviewer');
       
-      expect(agent1.agentId).toBe(agent2.agentId);
-      expect(agent1.authToken).toBe(agent2.authToken);
+      // In v3.2, registerAgent always creates new agents (with warning)
+      // Duplicate prevention is handled at server level
+      expect(agent1.agentId).not.toBe(agent2.agentId);
+      expect(agent1.authToken).not.toBe(agent2.authToken);
+      expect(agent1.displayName).toBe('alice');
+      expect(agent2.displayName).toBe('alice');
     });
     
     it('should initialize with default stats', () => {
@@ -79,15 +90,16 @@ describe('IdentityManager', () => {
       expect(authenticated).toBeNull();
     });
     
-    it('should update last seen on authentication', () => {
+    it('should update last seen on authentication', async () => {
       const agent = identityManager.registerAgent('alice', 'coder');
       const beforeAuth = new Date(agent.lastSeen);
       
       // Wait a bit to ensure time difference
-      setTimeout(() => {
-        const authenticated = identityManager.authenticateAgent(agent.authToken);
-        expect(authenticated!.lastSeen.getTime()).toBeGreaterThan(beforeAuth.getTime());
-      }, 10);
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      const authenticated = identityManager.authenticateAgent(agent.authToken);
+      expect(authenticated).not.toBeNull();
+      expect(authenticated!.lastSeen.getTime()).toBeGreaterThan(beforeAuth.getTime());
     });
   });
   

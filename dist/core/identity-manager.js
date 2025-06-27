@@ -1,8 +1,8 @@
 "use strict";
 /**
- * HarmonyCode v3.1.0 - Identity Manager
+ * HarmonyCode v3.2.0 - Identity Manager
  * Implements persistent agent identity separate from roles and sessions
- * Fixes the critical identity crisis issue from user feedback
+ * Enhanced with unique name enforcement and session cleanup (v3.2)
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -47,6 +47,7 @@ class IdentityManager {
         this.identities = new Map();
         this.tokenToAgent = new Map();
         this.sessionToAgent = new Map();
+        this.nameToAgent = new Map(); // New: displayName -> agentId mapping
         this.persistPath = path.join(workspacePath, 'identities.json');
         this.loadIdentities();
     }
@@ -54,11 +55,11 @@ class IdentityManager {
      * Register a new agent or retrieve existing one
      */
     registerAgent(displayName, role = 'general') {
-        // Check if an agent with this display name already exists
-        const existingAgent = this.findAgentByDisplayName(displayName);
-        if (existingAgent) {
-            return existingAgent;
-        }
+        // This method should only be called for new agents in v3.2
+        // Use getOrCreateAgent for the new behavior
+        // For backward compatibility, still create new agent
+        // but log a warning
+        console.warn(`Warning: Creating new agent with name '${displayName}'. Multiple agents with same name detected.`);
         // Create new agent identity
         const agentId = this.generateAgentId();
         const authToken = this.generateAuthToken();
@@ -87,6 +88,7 @@ class IdentityManager {
         };
         this.identities.set(agentId, identity);
         this.tokenToAgent.set(authToken, agentId);
+        this.nameToAgent.set(displayName, agentId); // Track name -> agentId mapping
         this.saveIdentities();
         return identity;
     }
@@ -118,6 +120,7 @@ class IdentityManager {
         }
         // Connect to new session
         identity.currentSessionId = sessionId;
+        identity.lastActivityTime = new Date(); // v3.2: Track activity
         identity.stats.totalSessions++;
         this.sessionToAgent.set(sessionId, agentId);
         this.saveIdentities();
@@ -186,17 +189,6 @@ class IdentityManager {
         return this.identities.get(agentId) || null;
     }
     /**
-     * Find agent by display name
-     */
-    findAgentByDisplayName(displayName) {
-        for (const identity of this.identities.values()) {
-            if (identity.displayName === displayName) {
-                return identity;
-            }
-        }
-        return null;
-    }
-    /**
      * Update agent statistics
      */
     updateAgentStats(agentId, updates) {
@@ -248,6 +240,154 @@ class IdentityManager {
         return report.join('\n');
     }
     /**
+     * Find agent by display name (v3.2)
+     */
+    findAgentByDisplayName(displayName) {
+        const agentId = this.nameToAgent.get(displayName);
+        if (!agentId)
+            return null;
+        return this.identities.get(agentId) || null;
+    }
+    /**
+     * Check if a display name is available (v3.2)
+     */
+    isNameAvailable(displayName) {
+        return !this.nameToAgent.has(displayName);
+    }
+    /**
+     * Get or create agent with unique name enforcement (v3.2)
+     */
+    getOrCreateAgent(displayName, role = 'general', authToken) {
+        // If auth token provided, try to authenticate first
+        if (authToken) {
+            const authenticated = this.authenticateAgent(authToken);
+            if (authenticated) {
+                return authenticated;
+            }
+        }
+        // Check if name already exists
+        const existing = this.findAgentByDisplayName(displayName);
+        if (existing) {
+            // Update last seen and return existing agent
+            existing.lastSeen = new Date();
+            this.saveIdentities();
+            return existing;
+        }
+        // Create new agent with unique name
+        return this.createNewAgent(displayName, role);
+    }
+    /**
+     * Create new agent with unique name (v3.2)
+     */
+    createNewAgent(displayName, role) {
+        const agentId = this.generateAgentId();
+        const authToken = this.generateAuthToken();
+        const identity = {
+            agentId,
+            displayName,
+            firstSeen: new Date(),
+            lastSeen: new Date(),
+            currentRole: role,
+            roleHistory: [{
+                    role,
+                    timestamp: new Date(),
+                    sessionId: 'initial'
+                }],
+            perspectiveHistory: [],
+            stats: {
+                totalSessions: 0,
+                totalMessages: 0,
+                totalTasks: 0,
+                totalEdits: 0,
+                diversityScore: 0.5,
+                agreementRate: 0.5,
+                evidenceRate: 0.5
+            },
+            authToken
+        };
+        this.identities.set(agentId, identity);
+        this.tokenToAgent.set(authToken, agentId);
+        this.nameToAgent.set(displayName, agentId);
+        this.saveIdentities();
+        return identity;
+    }
+    /**
+     * Get name suggestions when a name is taken (v3.2)
+     */
+    getNameSuggestions(baseName, count = 3) {
+        const suggestions = [];
+        let counter = 2;
+        // Try numbered suffixes
+        while (suggestions.length < count && counter <= 10) {
+            const suggestion = `${baseName}${counter}`;
+            if (this.isNameAvailable(suggestion)) {
+                suggestions.push(suggestion);
+            }
+            counter++;
+        }
+        // Try with underscores
+        if (suggestions.length < count) {
+            const suggestion = `${baseName}_new`;
+            if (this.isNameAvailable(suggestion)) {
+                suggestions.push(suggestion);
+            }
+        }
+        // Try with role suffix
+        if (suggestions.length < count) {
+            const suggestion = `${baseName}_agent`;
+            if (this.isNameAvailable(suggestion)) {
+                suggestions.push(suggestion);
+            }
+        }
+        return suggestions.slice(0, count);
+    }
+    /**
+     * Update agent activity time (v3.2)
+     */
+    updateAgentActivity(agentId) {
+        const identity = this.identities.get(agentId);
+        if (identity && identity.currentSessionId) {
+            identity.lastActivityTime = new Date();
+            this.saveIdentities();
+        }
+    }
+    /**
+     * Clean up inactive sessions (v3.2)
+     */
+    cleanupInactiveSessions(timeoutMs = 300000) {
+        let cleanedCount = 0;
+        const cutoffTime = new Date(Date.now() - timeoutMs);
+        for (const [agentId, identity] of this.identities) {
+            if (identity.currentSessionId &&
+                identity.lastActivityTime &&
+                identity.lastActivityTime < cutoffTime) {
+                console.log(`🧹 Cleaning up inactive session for ${identity.displayName} (${agentId})`);
+                // Disconnect from session
+                this.sessionToAgent.delete(identity.currentSessionId);
+                identity.currentSessionId = undefined;
+                identity.lastActivityTime = undefined;
+                cleanedCount++;
+            }
+        }
+        if (cleanedCount > 0) {
+            this.saveIdentities();
+            console.log(`✅ Cleaned up ${cleanedCount} inactive sessions`);
+        }
+        return cleanedCount;
+    }
+    /**
+     * Get session activity report (v3.2)
+     */
+    getSessionActivityReport() {
+        const activeAgents = this.getActiveAgents();
+        const totalAgents = this.identities.size;
+        return {
+            active: activeAgents.length,
+            inactive: totalAgents - activeAgents.length,
+            total: totalAgents
+        };
+    }
+    /**
      * Generate unique agent ID
      */
     generateAgentId() {
@@ -280,6 +420,7 @@ class IdentityManager {
                     });
                     this.identities.set(identity.agentId, identity);
                     this.tokenToAgent.set(identity.authToken, identity.agentId);
+                    this.nameToAgent.set(identity.displayName, identity.agentId); // v3.2: Track name mapping
                     if (identity.currentSessionId) {
                         this.sessionToAgent.set(identity.currentSessionId, identity.agentId);
                     }
@@ -297,7 +438,7 @@ class IdentityManager {
         try {
             const data = {
                 identities: Array.from(this.identities.values()),
-                version: '3.1.0'
+                version: '3.2.0'
             };
             fs.writeFileSync(this.persistPath, JSON.stringify(data, null, 2));
         }

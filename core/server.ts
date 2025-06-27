@@ -1,6 +1,7 @@
 /**
- * HarmonyCode v3.0.0 - Core WebSocket Server
+ * HarmonyCode v3.2.0 - Core WebSocket Server
  * Real-time collaboration with anti-echo-chamber enforcement
+ * Enhanced with unique name enforcement and session cleanup
  */
 
 import { WebSocket, WebSocketServer } from 'ws';
@@ -39,6 +40,7 @@ export class HarmonyCodeServer extends EventEmitter {
   private orchestration: OrchestrationEngine;
   private realtimeEnhancer: RealtimeEnhancer;
   private projectPath: string;
+  private cleanupInterval?: NodeJS.Timeout; // v3.2: Session cleanup timer
 
   constructor(config: ServerConfig = { port: 8765, enableAntiEcho: true }) {
     super();
@@ -68,7 +70,7 @@ export class HarmonyCodeServer extends EventEmitter {
     
     console.log(`
 ╔════════════════════════════════════════════════════════╗
-║           🎵 HarmonyCode v3.1.0 Server 🎵              ║
+║           🎵 HarmonyCode v3.2.0 Server 🎵              ║
 ║                                                        ║
 ║  Real-time collaboration with persistent identity      ║
 ║  Anti-echo-chamber: ${this.config.enableAntiEcho ? 'ENABLED ✓' : 'DISABLED'}                           ║
@@ -95,6 +97,81 @@ export class HarmonyCodeServer extends EventEmitter {
     if (this.config.enableAntiEcho) {
       this.startDiversityMonitoring();
     }
+
+    // Start session cleanup (v3.2)
+    this.startSessionCleanup();
+  }
+
+  /**
+   * Check version compatibility between client and server (v3.2)
+   */
+  private checkVersionCompatibility(clientVersion?: string): { message: string; severity: 'warning' | 'error'; upgradeAction?: string } | null {
+    const serverVersion = '3.2.0';
+    
+    if (!clientVersion) {
+      return {
+        message: 'Client version unknown - please upgrade your CLI',
+        severity: 'warning',
+        upgradeAction: 'npm install -g harmonycode@latest'
+      };
+    }
+
+    if (clientVersion === serverVersion) {
+      return null; // Perfect match
+    }
+
+    const parseVersion = (version: string) => {
+      const parts = version.replace(/[^0-9.]/g, '').split('.');
+      return {
+        major: parseInt(parts[0] || '0'),
+        minor: parseInt(parts[1] || '0'),
+        patch: parseInt(parts[2] || '0')
+      };
+    };
+
+    const client = parseVersion(clientVersion);
+    const server = parseVersion(serverVersion);
+
+    // Major version difference (breaking changes)
+    if (client.major !== server.major) {
+      return {
+        message: `Major version mismatch! Client: ${clientVersion}, Server: ${serverVersion}`,
+        severity: 'error',
+        upgradeAction: client.major < server.major 
+          ? `npm install -g harmonycode@${serverVersion}` 
+          : 'Server needs upgrading'
+      };
+    }
+
+    // Minor version difference (new features)
+    if (client.minor !== server.minor) {
+      const isClientOlder = client.minor < server.minor || 
+        (client.minor === server.minor && client.patch < server.patch);
+      
+      return {
+        message: isClientOlder
+          ? `Client outdated: ${clientVersion} < ${serverVersion}. Missing v3.2 features!`
+          : `Client newer: ${clientVersion} > ${serverVersion}. Some features may not work.`,
+        severity: 'warning',
+        upgradeAction: isClientOlder 
+          ? `npm install -g harmonycode@${serverVersion}`
+          : 'Consider upgrading server'
+      };
+    }
+
+    // Patch version difference (bug fixes)
+    if (client.patch !== server.patch) {
+      const isClientOlder = client.patch < server.patch;
+      return {
+        message: isClientOlder
+          ? `Client has older patch: ${clientVersion} (latest: ${serverVersion})`
+          : `Client has newer patch: ${clientVersion} (server: ${serverVersion})`,
+        severity: 'warning',
+        upgradeAction: isClientOlder ? `npm install -g harmonycode@${serverVersion}` : undefined
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -110,6 +187,8 @@ export class HarmonyCodeServer extends EventEmitter {
         
         if (message.type === 'auth') {
           await this.handleAuthentication(ws, sessionId, message);
+        } else if (message.type === 'register') {
+          await this.handleRegistration(ws, message);
         } else {
           // Reject non-auth messages from unauthenticated connections
           ws.send(JSON.stringify({
@@ -133,7 +212,13 @@ export class HarmonyCodeServer extends EventEmitter {
    */
   private async handleAuthentication(ws: WebSocket, sessionId: string, authMessage: any): Promise<void> {
     try {
-      const { agentName, authToken, role = 'general', perspective } = authMessage;
+      const { agentName, authToken, role = 'general', perspective, clientVersion } = authMessage;
+      
+      // Version compatibility check (v3.2)
+      const versionWarning = this.checkVersionCompatibility(clientVersion);
+      if (versionWarning) {
+        console.log(`⚠️  Version mismatch for ${agentName}: ${versionWarning.message}`);
+      }
       
       // Create or authenticate session
       const session = this.sessions.createSession(
@@ -162,7 +247,9 @@ export class HarmonyCodeServer extends EventEmitter {
         totalSessions: agentIdentity.stats.totalSessions,
         totalContributions: agentIdentity.stats.totalMessages + agentIdentity.stats.totalTasks + agentIdentity.stats.totalEdits,
         lastSeen: agentIdentity.lastSeen,
-        serverVersion: '3.1.0',
+        serverVersion: '3.2.0',
+        clientVersion: clientVersion || 'unknown',
+        versionWarning: versionWarning || null, // v3.2: Include version compatibility warning
         capabilities: {
           realtime: true,
           orchestration: true,
@@ -198,6 +285,62 @@ export class HarmonyCodeServer extends EventEmitter {
       ws.send(JSON.stringify({
         type: 'auth-failed',
         reason: error.message || 'Authentication failed'
+      }));
+      ws.close();
+    }
+  }
+
+  /**
+   * Handle agent registration (v3.2)
+   */
+  private async handleRegistration(ws: WebSocket, registerMessage: any): Promise<void> {
+    try {
+      const { agentName, role = 'general', forceNew = false } = registerMessage;
+      
+      if (!agentName) {
+        ws.send(JSON.stringify({
+          type: 'register-failed',
+          reason: 'Agent name is required'
+        }));
+        ws.close();
+        return;
+      }
+
+      // Check if name is available
+      if (!forceNew && !this.identityManager.isNameAvailable(agentName)) {
+        const suggestions = this.identityManager.getNameSuggestions(agentName, 3);
+        ws.send(JSON.stringify({
+          type: 'register-failed',
+          reason: 'name-taken',
+          suggestions
+        }));
+        ws.close();
+        return;
+      }
+
+      // Create new agent identity
+      const identity = forceNew 
+        ? this.identityManager.registerAgent(agentName, role) // Allow duplicate if forced
+        : this.identityManager.createNewAgent(agentName, role);
+
+      console.log(`✅ New agent registered: ${agentName} (${identity.agentId})`);
+
+      // Send success response
+      ws.send(JSON.stringify({
+        type: 'register-success',
+        agentId: identity.agentId,
+        agentName: identity.displayName,
+        authToken: identity.authToken,
+        role: identity.currentRole
+      }));
+
+      ws.close();
+      
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      ws.send(JSON.stringify({
+        type: 'register-failed',
+        reason: error.message || 'Registration failed'
       }));
       ws.close();
     }
@@ -289,6 +432,9 @@ export class HarmonyCodeServer extends EventEmitter {
       if (this.config.enableAntiEcho) {
         this.diversity.recordContribution(session.id, message);
       }
+
+      // Update activity time for session cleanup (v3.2)
+      this.identityManager.updateAgentActivity(session.agentId);
       
     } catch (error) {
       console.error(`Error handling message from ${session.name}:`, error);
@@ -495,6 +641,31 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
+   * Start session cleanup for ghost sessions (v3.2)
+   */
+  private startSessionCleanup(): void {
+    this.cleanupInterval = setInterval(() => {
+      const cleanedCount = this.identityManager.cleanupInactiveSessions(300000); // 5 minutes
+      
+      if (cleanedCount > 0) {
+        // Broadcast session update to remaining clients
+        this.broadcast({
+          type: 'session-cleanup',
+          cleanedSessions: cleanedCount,
+          timestamp: Date.now()
+        });
+      }
+      
+      // Log session activity report every hour
+      const now = new Date();
+      if (now.getMinutes() === 0) {
+        const report = this.identityManager.getSessionActivityReport();
+        console.log(`📊 Session Activity: ${report.active} active, ${report.inactive} inactive, ${report.total} total`);
+      }
+    }, 60000); // Every minute
+  }
+
+  /**
    * Initialize project directory structure
    */
   private initializeProjectStructure(): void {
@@ -673,29 +844,132 @@ export class HarmonyCodeServer extends EventEmitter {
   }
 
   /**
-   * Handle identity query
+   * Handle identity query with enhanced identity card (v3.2)
    */
   private async handleWhoAmI(session: any): Promise<void> {
     const identity = session.agentIdentity;
+    const activeSessions = this.sessions.getAllSessions().length;
+    const agentRank = this.calculateAgentRank(identity);
+    const timeInSystem = Date.now() - identity.firstSeen.getTime();
+    const daysSinceJoined = Math.floor(timeInSystem / (1000 * 60 * 60 * 24));
+    
     session.ws.send(JSON.stringify({
-      type: 'identity-info',
-      agentId: identity.agentId,
-      displayName: identity.displayName,
-      currentRole: session.currentRole,
-      currentPerspective: session.currentPerspective,
-      stats: identity.stats,
-      roleHistory: identity.roleHistory,
-      firstSeen: identity.firstSeen,
-      sessionInfo: {
-        sessionId: session.id,
-        joinedAt: session.joinedAt,
-        sessionContributions: {
-          messages: session.sessionMessages,
-          edits: session.sessionEdits,
-          tasks: session.sessionTasks
-        }
+      type: 'identity-card',
+      card: {
+        // Basic Identity
+        agentId: identity.agentId,
+        displayName: identity.displayName,
+        firstSeen: identity.firstSeen,
+        lastSeen: identity.lastSeen,
+        daysSinceJoined,
+        
+        // Current Status
+        currentRole: session.currentRole,
+        currentPerspective: session.currentPerspective,
+        isActive: true,
+        
+        // Statistics & Rankings
+        stats: identity.stats,
+        rank: agentRank,
+        
+        // Session Information
+        sessionInfo: {
+          sessionId: session.id,
+          joinedAt: session.joinedAt,
+          currentSessionContributions: {
+            messages: session.sessionMessages || 0,
+            edits: session.sessionEdits || 0,
+            tasks: session.sessionTasks || 0
+          }
+        },
+        
+        // History & Evolution
+        roleHistory: identity.roleHistory.slice(-5), // Last 5 role changes
+        perspectiveHistory: identity.perspectiveHistory.slice(-3), // Last 3 perspective changes
+        
+        // System Context
+        systemInfo: {
+          totalActiveSessions: activeSessions,
+          serverVersion: '3.2.0',
+          antiEchoChamberEnabled: this.config.enableAntiEcho,
+          diversityScore: identity.stats.diversityScore,
+          evidenceRate: identity.stats.evidenceRate
+        },
+        
+        // Achievement Badges
+        badges: this.calculateAchievementBadges(identity),
+        
+        // Recommendations
+        recommendations: this.generateRecommendations(identity, session)
       }
     }));
+  }
+
+  /**
+   * Calculate agent rank based on contributions (v3.2)
+   */
+  private calculateAgentRank(identity: any): { title: string; level: number; nextLevel: string } {
+    const totalContributions = identity.stats.totalMessages + identity.stats.totalTasks + identity.stats.totalEdits;
+    const diversityBonus = identity.stats.diversityScore * 10;
+    const evidenceBonus = identity.stats.evidenceRate * 5;
+    const score = totalContributions + diversityBonus + evidenceBonus;
+    
+    if (score >= 100) return { title: 'Master Collaborator', level: 5, nextLevel: 'Legend' };
+    if (score >= 50) return { title: 'Senior Contributor', level: 4, nextLevel: 'Master Collaborator' };
+    if (score >= 25) return { title: 'Active Member', level: 3, nextLevel: 'Senior Contributor' };
+    if (score >= 10) return { title: 'Contributor', level: 2, nextLevel: 'Active Member' };
+    return { title: 'Newcomer', level: 1, nextLevel: 'Contributor' };
+  }
+
+  /**
+   * Calculate achievement badges (v3.2)
+   */
+  private calculateAchievementBadges(identity: any): string[] {
+    const badges = [];
+    
+    if (identity.stats.totalSessions >= 10) badges.push('🏆 Veteran');
+    if (identity.stats.diversityScore >= 0.8) badges.push('🌈 Diversity Champion');
+    if (identity.stats.evidenceRate >= 0.8) badges.push('📊 Evidence Expert');
+    if (identity.stats.totalMessages >= 50) badges.push('💬 Communicator');
+    if (identity.stats.totalTasks >= 20) badges.push('📋 Task Master');
+    if (identity.stats.totalEdits >= 30) badges.push('✏️ Editor');
+    if (identity.roleHistory.length >= 5) badges.push('🎭 Role Explorer');
+    
+    const daysSinceJoined = Math.floor((Date.now() - identity.firstSeen.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSinceJoined >= 30) badges.push('📅 Long-term Collaborator');
+    if (daysSinceJoined >= 7) badges.push('📈 Consistent Contributor');
+    
+    return badges;
+  }
+
+  /**
+   * Generate personalized recommendations (v3.2)
+   */
+  private generateRecommendations(identity: any, session: any): string[] {
+    const recommendations = [];
+    
+    if (identity.stats.diversityScore < 0.5) {
+      recommendations.push('Try adopting different perspectives to increase diversity');
+    }
+    
+    if (identity.stats.evidenceRate < 0.6) {
+      recommendations.push('Include more evidence in your arguments and proposals');
+    }
+    
+    if (identity.roleHistory.length < 3) {
+      recommendations.push('Experiment with different roles to broaden your experience');
+    }
+    
+    if (identity.stats.totalTasks < 5) {
+      recommendations.push('Consider creating or claiming tasks to increase collaboration');
+    }
+    
+    const recentMessages = identity.stats.totalMessages / Math.max(identity.stats.totalSessions, 1);
+    if (recentMessages < 2) {
+      recommendations.push('Share more insights in discussions to help the team');
+    }
+    
+    return recommendations;
   }
   
   /**
@@ -766,6 +1040,11 @@ export class HarmonyCodeServer extends EventEmitter {
     
     // Stop real-time watchers
     this.realtimeEnhancer.destroy();
+    
+    // Stop session cleanup timer (v3.2)
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
     
     // Close connections
     this.sessions.getAllSessions().forEach(session => {

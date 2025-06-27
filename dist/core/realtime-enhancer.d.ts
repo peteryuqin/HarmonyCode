@@ -1,6 +1,7 @@
 /**
- * HarmonyCode v3.1.0 - Real-time Enhancer
+ * HarmonyCode v3.2.0 - Real-time Enhancer
  * Adds file watching and instant updates to improve real-time experience
+ * Enhanced with session notifications and message queue
  */
 import { EventEmitter } from 'events';
 import { WebSocket } from 'ws';
@@ -16,12 +17,20 @@ export interface RealtimeConfig {
     enableNotifications: boolean;
     enableLiveCursors: boolean;
 }
+export interface QueuedMessage {
+    type: string;
+    data: any;
+    timestamp: Date;
+    priority: 'low' | 'medium' | 'high';
+}
 export declare class RealtimeEnhancer extends EventEmitter {
     private config;
     private watchers;
     private debounceTimers;
     private cursorPositions;
     private activeEditors;
+    private messageQueue;
+    private queueProcessor?;
     constructor(config?: Partial<RealtimeConfig>);
     /**
      * Start watching files for real-time updates
@@ -79,6 +88,29 @@ export declare class RealtimeEnhancer extends EventEmitter {
      * Get file update stream for WebSocket
      */
     createUpdateStream(ws: WebSocket): void;
+    /**
+     * Start message queue processing (v3.2)
+     */
+    private startMessageQueue;
+    /**
+     * Process queued messages with batching and priority (v3.2)
+     */
+    private processMessageQueue;
+    /**
+     * Queue a message for processing (v3.2)
+     */
+    private queueMessage;
+    /**
+     * Get queue status (v3.2)
+     */
+    getQueueStatus(): {
+        pending: number;
+        priorities: Record<string, number>;
+    };
+    /**
+     * Enhanced notification with auto-queuing (v3.2)
+     */
+    private sendEnhancedNotification;
     /**
      * Clean up resources
      */

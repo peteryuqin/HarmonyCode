@@ -57,8 +57,8 @@ export class EnhancedSessionManager {
         throw new Error('Invalid authentication token');
       }
     } else if (displayName) {
-      // Register new agent or retrieve existing by name
-      agentIdentity = this.identityManager.registerAgent(displayName, role);
+      // v3.2: Use getOrCreateAgent to enforce unique names
+      agentIdentity = this.identityManager.getOrCreateAgent(displayName, role, authToken);
     } else {
       throw new Error('Either authToken or displayName must be provided');
     }

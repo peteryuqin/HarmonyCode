@@ -1,6 +1,7 @@
 /**
- * HarmonyCode v3.0.0 - Core WebSocket Server
+ * HarmonyCode v3.2.0 - Core WebSocket Server
  * Real-time collaboration with anti-echo-chamber enforcement
+ * Enhanced with unique name enforcement and session cleanup
  */
 import { EventEmitter } from 'events';
 export interface ServerConfig {
@@ -27,11 +28,16 @@ export declare class HarmonyCodeServer extends EventEmitter {
     private orchestration;
     private realtimeEnhancer;
     private projectPath;
+    private cleanupInterval?;
     constructor(config?: ServerConfig);
     /**
      * Start the HarmonyCode server
      */
     start(): Promise<void>;
+    /**
+     * Check version compatibility between client and server (v3.2)
+     */
+    private checkVersionCompatibility;
     /**
      * Handle new WebSocket connection with identity support
      */
@@ -40,6 +46,10 @@ export declare class HarmonyCodeServer extends EventEmitter {
      * Handle agent authentication
      */
     private handleAuthentication;
+    /**
+     * Handle agent registration (v3.2)
+     */
+    private handleRegistration;
     /**
      * Handle incoming message with diversity checks
      */
@@ -68,6 +78,10 @@ export declare class HarmonyCodeServer extends EventEmitter {
      * Monitor and report diversity metrics
      */
     private startDiversityMonitoring;
+    /**
+     * Start session cleanup for ghost sessions (v3.2)
+     */
+    private startSessionCleanup;
     /**
      * Initialize project directory structure
      */
@@ -109,9 +123,21 @@ export declare class HarmonyCodeServer extends EventEmitter {
      */
     private shouldOrchestrate;
     /**
-     * Handle identity query
+     * Handle identity query with enhanced identity card (v3.2)
      */
     private handleWhoAmI;
+    /**
+     * Calculate agent rank based on contributions (v3.2)
+     */
+    private calculateAgentRank;
+    /**
+     * Calculate achievement badges (v3.2)
+     */
+    private calculateAchievementBadges;
+    /**
+     * Generate personalized recommendations (v3.2)
+     */
+    private generateRecommendations;
     /**
      * Handle role switch request
      */

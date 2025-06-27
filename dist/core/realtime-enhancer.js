@@ -1,7 +1,8 @@
 "use strict";
 /**
- * HarmonyCode v3.1.0 - Real-time Enhancer
+ * HarmonyCode v3.2.0 - Real-time Enhancer
  * Adds file watching and instant updates to improve real-time experience
+ * Enhanced with session notifications and message queue
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -48,6 +49,7 @@ class RealtimeEnhancer extends events_1.EventEmitter {
         this.debounceTimers = new Map();
         this.cursorPositions = new Map();
         this.activeEditors = new Map();
+        this.messageQueue = new Array(); // v3.2: Message queue for batching
         this.config = {
             watchPaths: ['.harmonycode'],
             debounceMs: 100,
@@ -55,6 +57,8 @@ class RealtimeEnhancer extends events_1.EventEmitter {
             enableLiveCursors: true,
             ...config
         };
+        // Start message queue processor (v3.2)
+        this.startMessageQueue();
     }
     /**
      * Start watching files for real-time updates
@@ -141,7 +145,7 @@ class RealtimeEnhancer extends events_1.EventEmitter {
         }
         // Send notification if enabled
         if (this.config.enableNotifications) {
-            this.sendNotification(event);
+            this.sendEnhancedNotification(event);
         }
     }
     /**
@@ -325,6 +329,88 @@ class RealtimeEnhancer extends events_1.EventEmitter {
         });
     }
     /**
+     * Start message queue processing (v3.2)
+     */
+    startMessageQueue() {
+        this.queueProcessor = setInterval(() => {
+            this.processMessageQueue();
+        }, 100); // Process queue every 100ms
+    }
+    /**
+     * Process queued messages with batching and priority (v3.2)
+     */
+    processMessageQueue() {
+        if (this.messageQueue.length === 0)
+            return;
+        // Sort by priority and timestamp
+        this.messageQueue.sort((a, b) => {
+            const priorityOrder = { high: 3, medium: 2, low: 1 };
+            const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+            if (priorityDiff !== 0)
+                return priorityDiff;
+            return a.timestamp.getTime() - b.timestamp.getTime();
+        });
+        // Process up to 5 messages per batch to prevent overwhelming
+        const batch = this.messageQueue.splice(0, 5);
+        batch.forEach(queuedMessage => {
+            this.emit('queued-notification', queuedMessage);
+        });
+        if (batch.length > 0) {
+            console.log(`📨 Processed ${batch.length} queued notifications`);
+        }
+    }
+    /**
+     * Queue a message for processing (v3.2)
+     */
+    queueMessage(type, data, priority = 'medium') {
+        this.messageQueue.push({
+            type,
+            data,
+            timestamp: new Date(),
+            priority
+        });
+        // If high priority, process immediately
+        if (priority === 'high') {
+            this.processMessageQueue();
+        }
+    }
+    /**
+     * Get queue status (v3.2)
+     */
+    getQueueStatus() {
+        const priorities = { high: 0, medium: 0, low: 0 };
+        this.messageQueue.forEach(msg => priorities[msg.priority]++);
+        return {
+            pending: this.messageQueue.length,
+            priorities
+        };
+    }
+    /**
+     * Enhanced notification with auto-queuing (v3.2)
+     */
+    sendEnhancedNotification(event) {
+        const notification = {
+            type: 'file-notification',
+            event,
+            message: this.getNotificationMessage(event)
+        };
+        // Determine priority based on file type
+        let priority = 'medium';
+        if (event.filename.includes('message') || event.filename === 'DISCUSSION_BOARD.md') {
+            priority = 'high'; // Messages get high priority
+        }
+        else if (event.filename === 'TASK_BOARD.md') {
+            priority = 'medium';
+        }
+        else {
+            priority = 'low';
+        }
+        // Queue the notification
+        this.queueMessage('notification', notification, priority);
+        // Also emit immediately for real-time listeners
+        this.emit('notification', notification);
+    }
+    /**
      * Clean up resources
      */
     destroy() {
@@ -333,6 +419,10 @@ class RealtimeEnhancer extends events_1.EventEmitter {
         this.debounceTimers.clear();
         this.cursorPositions.clear();
         this.activeEditors.clear();
+        // Stop queue processor (v3.2)
+        if (this.queueProcessor) {
+            clearInterval(this.queueProcessor);
+        }
         this.removeAllListeners();
     }
 }

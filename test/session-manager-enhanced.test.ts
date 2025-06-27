@@ -7,6 +7,7 @@ import { EnhancedSessionManager } from '../core/session-manager-enhanced';
 import { IdentityManager } from '../core/identity-manager';
 import { WebSocket } from 'ws';
 import * as fs from 'fs';
+import * as path from 'path';
 
 // Mock WebSocket
 jest.mock('ws');
@@ -21,6 +22,12 @@ describe('EnhancedSessionManager', () => {
     // Create test workspace
     if (!fs.existsSync(testWorkspace)) {
       fs.mkdirSync(testWorkspace, { recursive: true });
+    }
+    
+    // Clear any existing identity files
+    const identitiesPath = path.join(testWorkspace, 'identities.json');
+    if (fs.existsSync(identitiesPath)) {
+      fs.unlinkSync(identitiesPath);
     }
     
     // Set up managers

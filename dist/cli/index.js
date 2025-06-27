@@ -147,21 +147,56 @@ program
     .command('register <agent-name>')
     .description('Register a new agent identity')
     .option('-r, --role <role>', 'Default role', 'general')
+    .option('-s, --server <url>', 'Server URL', 'ws://localhost:8765')
+    .option('-f, --force', 'Force registration even if name exists (v3.2)')
     .action(async (agentName, options) => {
     const spinner = ora('Registering new agent identity...').start();
     try {
-        // This would connect to server to register
-        // For now, show what would happen
-        const agentId = `agent-${Date.now().toString(36)}`;
-        const authToken = require('crypto').randomBytes(32).toString('hex');
-        // Save auth token
-        saveAuthToken(agentName, authToken, agentId);
-        spinner.succeed(chalk.green(`Agent registered: ${agentName}`));
-        console.log(chalk.gray(`Agent ID: ${agentId}`));
-        console.log(chalk.gray(`Default role: ${options.role}`));
-        console.log(chalk.cyan('\nAuthentication token saved!'));
-        console.log(chalk.yellow('\nUse this command to join:'));
-        console.log(chalk.gray(`  harmonycode join ${agentName}`));
+        // Connect to server to register
+        const ws = new WebSocket(options.server);
+        ws.on('open', () => {
+            // Send registration request
+            ws.send(JSON.stringify({
+                type: 'register',
+                agentName,
+                role: options.role,
+                forceNew: options.force || false
+            }));
+        });
+        ws.on('message', (data) => {
+            const message = JSON.parse(data.toString());
+            if (message.type === 'register-success') {
+                // Save auth token
+                saveAuthToken(agentName, message.authToken, message.agentId);
+                spinner.succeed(chalk.green(`Agent registered: ${agentName}`));
+                console.log(chalk.gray(`Agent ID: ${message.agentId}`));
+                console.log(chalk.gray(`Default role: ${options.role}`));
+                console.log(chalk.cyan('\nAuthentication token saved!'));
+                console.log(chalk.yellow('\nUse this command to join:'));
+                console.log(chalk.gray(`  harmonycode join ${agentName}`));
+                ws.close();
+            }
+            else if (message.type === 'register-failed') {
+                if (message.reason === 'name-taken') {
+                    spinner.fail(chalk.red(`Name '${agentName}' is already taken!`));
+                    if (message.suggestions && message.suggestions.length > 0) {
+                        console.log(chalk.yellow('\nAvailable alternatives:'));
+                        message.suggestions.forEach(suggestion => {
+                            console.log(chalk.gray(`  - ${suggestion}`));
+                        });
+                    }
+                    console.log(chalk.gray('\nUse --force to override (creates new agent with same name)'));
+                }
+                else {
+                    spinner.fail(chalk.red('Registration failed: ' + message.reason));
+                }
+                ws.close();
+            }
+        });
+        ws.on('error', (err) => {
+            spinner.fail(chalk.red('Failed to connect to server'));
+            console.error(err);
+        });
     }
     catch (error) {
         spinner.fail(chalk.red('Registration failed'));
@@ -228,13 +263,14 @@ program
         // Connect to WebSocket server with auth info
         const ws = new WebSocket(options.server);
         ws.on('open', () => {
-            // Send authentication/registration message
+            // Send authentication/registration message with version info
             ws.send(JSON.stringify({
                 type: 'auth',
                 agentName,
                 authToken,
                 role: options.role,
-                perspective: options.perspective
+                perspective: options.perspective,
+                clientVersion: VERSION // v3.2: Send client version for compatibility checking
             }));
         });
         ws.on('message', (data) => {
@@ -245,6 +281,23 @@ program
                 console.log(chalk.gray(`Role: ${options.role}`));
                 if (options.perspective) {
                     console.log(chalk.gray(`Perspective: ${options.perspective}`));
+                }
+                // Display version information and warnings (v3.2)
+                if (message.versionWarning) {
+                    const warning = message.versionWarning;
+                    if (warning.severity === 'error') {
+                        console.log(chalk.red(`\n⚠️  ${warning.message}`));
+                    }
+                    else {
+                        console.log(chalk.yellow(`\n⚠️  ${warning.message}`));
+                    }
+                    if (warning.upgradeAction) {
+                        console.log(chalk.cyan(`💡 Upgrade: ${warning.upgradeAction}`));
+                    }
+                    console.log(chalk.gray(`Server: v${message.serverVersion}, Client: v${message.clientVersion}\n`));
+                }
+                else {
+                    console.log(chalk.green(`\n✅ Version compatible: v${message.serverVersion}\n`));
                 }
                 // Save auth token for future sessions
                 if (message.authToken && !authToken) {
