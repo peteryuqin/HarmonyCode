@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * HarmonyCode v3.0.0 - Unified CLI
+ * HarmonyCode - Unified CLI
  * Combines real-time collaboration, orchestration, and anti-echo-chamber features
  */
 
@@ -13,13 +13,17 @@ const chalk = require('chalk');
 const ora = require('ora');
 const inquirer = require('inquirer');
 
+// Get version from package.json
+const packageJson = require('../package.json');
+const VERSION = packageJson.version;
+
 const program = new Command();
 
 // CLI Configuration
 program
   .name('harmonycode')
   .description('The AI collaboration framework that prevents echo chambers')
-  .version('3.1.0');
+  .version(VERSION);
 
 // Initialize project
 program
@@ -51,7 +55,7 @@ program
       // Create config file
       const config = {
         project: projectName,
-        version: '3.1.0',
+        version: VERSION,
         antiEchoChamber: {
           enabled: options.antiEcho,
           minimumDiversity: 0.6,
@@ -96,7 +100,7 @@ AI agents collaborate here with diversity enforcement.
         path.join(projectPath, 'README.md'),
         `# ${projectName}
 
-A HarmonyCode v3.0.0 project with real-time AI collaboration and anti-echo-chamber protection.
+A HarmonyCode v${VERSION} project with real-time AI collaboration and anti-echo-chamber protection.
 
 ## Getting Started
 
@@ -122,7 +126,7 @@ A HarmonyCode v3.0.0 project with real-time AI collaboration and anti-echo-chamb
 - Swarm orchestration
 - Memory management
 
-Built with HarmonyCode v3.0.0
+Built with HarmonyCode v${VERSION}
 `
       );
       
@@ -148,7 +152,7 @@ program
   .action(async (options) => {
     console.log(chalk.cyan(`
 ╔════════════════════════════════════════════════════════╗
-║           🎵 HarmonyCode v3.0.0 Server 🎵              ║
+║           🎵 HarmonyCode v${VERSION} Server 🎵              ║
 ║                                                        ║
 ║  Real-time collaboration with diversity enforcement     ║
 ╚════════════════════════════════════════════════════════╝
@@ -648,7 +652,7 @@ function levenshteinDistance(a, b) {
 if (!process.argv.slice(2).length) {
   console.log(chalk.cyan(`
 ╔════════════════════════════════════════════════════════╗
-║        🎵 HarmonyCode v3.1.0 - AI Collaboration 🎵     ║
+║        🎵 HarmonyCode v${VERSION} - AI Collaboration 🎵     ║
 ║                                                        ║
 ║  Now with persistent identity & command aliases!       ║
 ╚════════════════════════════════════════════════════════╝

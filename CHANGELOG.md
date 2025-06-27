@@ -5,6 +5,17 @@ All notable changes to HarmonyCode will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2025-06-27
+
+### Fixed
+- **Version Display Bug** - CLI now correctly shows version from package.json instead of hardcoded "3.0.0"
+- **Dynamic Version** - All version references in CLI output now use package.json version dynamically
+
+### Technical
+- CLI reads version from package.json at runtime
+- No more hardcoded version strings in CLI output
+- Fixes the issue where `harmonycode --version` showed "3.0.0" even with v3.1.0 installed
+
 ## [3.1.0] - 2025-01-26
 
 ### Added
